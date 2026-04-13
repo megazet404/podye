@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
 from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from database import init_db
-from handlers import process_message, process_chat_member_update, check_access
+from handlers import process_message, process_chat_member_update, is_allowed_chat, is_allowed_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,31 +18,31 @@ logger = logging.getLogger(__name__)
 dp = Dispatcher()
 
 @dp.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: types.Message) -> None:
     if message.chat.type == "private":
-        if message.from_user.id in ALLOWED_USERS:
+        if is_allowed_user(message.from_user.id):
             await message.answer("Bot initialized")
         else:
             await message.answer("Access denied")
             return
 
 @dp.message()
-async def handle_message(message: Message):
+async def handle_message(message: types.Message) -> None:
     logger.debug("Incoming Message: %s", json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
-    is_allowed = await check_access(message)
-    if not is_allowed:
+    if not is_allowed_chat(message.chat.id):
         return
+
     await process_message(message)
 
 @dp.chat_member()
-async def handle_chat_member(event: ChatMemberUpdated):
+async def handle_chat_member(event: types.ChatMemberUpdated) -> None:
     logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     await process_chat_member_update(event)
 
 @dp.my_chat_member()
-async def handle_my_chat_member(event: ChatMemberUpdated):
+async def handle_my_chat_member(event: types.ChatMemberUpdated) -> None:
     logger.debug("Incoming my ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     if event.new_chat_member.status == "kicked":

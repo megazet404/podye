@@ -14,9 +14,11 @@ from config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
 logger = logging.getLogger(__name__)
 
 def is_allowed_chat(chat_id: int) -> bool:
-    return chat_id in ALLOWED_CHATS
+    """Checks if chat_id is in allowed chats or allowed users (for private chats)."""
+    return chat_id in ALLOWED_CHATS or chat_id in ALLOWED_USERS
 
 def is_allowed_user(user_id: int) -> bool:
+    """Checks if user_id is in allowed users."""
     return user_id in ALLOWED_USERS
 
 def extract_user_data(user: types.User) -> dict:
@@ -145,9 +147,6 @@ async def process_message(message: types.Message) -> None:
 
     try:
         chat_id = message.chat.id
-        if not is_allowed_chat(chat_id):
-            logger.debug(f"Chat {chat_id} not in whitelist")
-            return
 
         upsert_chat(conn, extract_chat_data(message.chat), timestamp)
 
@@ -238,8 +237,3 @@ async def process_chat_member_update(event: ChatMemberUpdated) -> None:
 
     finally:
         conn.close()
-
-async def check_access(message: types.Message) -> bool:
-    if message.chat.type == "private":
-        return is_allowed_user(message.from_user.id)
-    return is_allowed_chat(message.chat.id)
