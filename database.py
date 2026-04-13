@@ -1,6 +1,9 @@
 import sqlite3
+import logging
 from pathlib import Path
 from typing import Optional, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 def init_db(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
@@ -105,6 +108,7 @@ def upsert_user(conn: sqlite3.Connection, user_data: dict, timestamp: int) -> No
         timestamp
     ))
     conn.commit()
+    logger.debug(f"User UPSERT: id={user_data.get('id')}, name={user_data.get('first_name')}")
 
 def upsert_chat(conn: sqlite3.Connection, chat_data: dict, timestamp: int) -> None:
     cursor = conn.cursor()
@@ -126,6 +130,7 @@ def upsert_chat(conn: sqlite3.Connection, chat_data: dict, timestamp: int) -> No
         timestamp
     ))
     conn.commit()
+    logger.debug(f"Chat UPSERT: id={chat_data.get('id')}, title={chat_data.get('title')}")
 
 def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
     cursor = conn.cursor()
@@ -149,10 +154,16 @@ def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
         message_data.get("edit_date")
     ))
     conn.commit()
-    return cursor.lastrowid
+    row_id = cursor.lastrowid
+    if row_id:
+        logger.debug(f"Message INSERT: tg_id={message_data.get('tg_id')}, local_id={row_id}")
+    else:
+        logger.debug(f"Message IGNORED (duplicate): tg_id={message_data.get('tg_id')}")
+    return row_id
 
 def insert_media(conn: sqlite3.Connection, message_id: int, media_list: List[dict]) -> None:
     cursor = conn.cursor()
+    count = 0
     for media in media_list:
         cursor.execute("""
         INSERT INTO message_media
@@ -169,7 +180,9 @@ def insert_media(conn: sqlite3.Connection, message_id: int, media_list: List[dic
             media.get("width"),
             media.get("height")
         ))
+        count += 1
     conn.commit()
+    logger.debug(f"Media INSERT: message_id={message_id}, count={count}")
 
 def update_chat_member_activity(conn: sqlite3.Connection, chat_id: int, user_id: int,
                                  timestamp: int, status: str = "member") -> None:
@@ -191,6 +204,7 @@ def update_chat_member_activity(conn: sqlite3.Connection, chat_id: int, user_id:
         timestamp
     ))
     conn.commit()
+    logger.debug(f"Member Activity UPDATE: chat={chat_id}, user={user_id}")
 
 def update_chat_member_status(conn: sqlite3.Connection, chat_id: int, user_id: int,
                                status: str, timestamp: int, is_left: bool = False) -> None:
@@ -214,6 +228,7 @@ def update_chat_member_status(conn: sqlite3.Connection, chat_id: int, user_id: i
             updated_at = excluded.updated_at
         """, (chat_id, user_id, status, timestamp, timestamp))
     conn.commit()
+    logger.debug(f"Member Status UPDATE: chat={chat_id}, user={user_id}, status={status}")
 
 def get_local_message_id(conn: sqlite3.Connection, tg_id: int, chat_id: int) -> Optional[int]:
     cursor = conn.cursor()

@@ -1,5 +1,6 @@
 import json
 import time
+import logging
 from typing import Optional, List, Dict, Any
 from aiogram import types
 from aiogram.types import ChatMemberUpdated
@@ -9,6 +10,8 @@ from database import (
     get_local_message_id
 )
 from config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
+
+logger = logging.getLogger(__name__)
 
 def is_allowed_chat(chat_id: int) -> bool:
     return chat_id in ALLOWED_CHATS
@@ -136,11 +139,14 @@ def extract_forward_sender_info(message: types.Message) -> tuple:
 
 async def process_message(message: types.Message) -> None:
     timestamp = int(time.time())
+    logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
+
     conn = get_db_connection(DB_PATH)
 
     try:
         chat_id = message.chat.id
         if not is_allowed_chat(chat_id):
+            logger.debug(f"Chat {chat_id} not in whitelist")
             return
 
         upsert_chat(conn, extract_chat_data(message.chat), timestamp)

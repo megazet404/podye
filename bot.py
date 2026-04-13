@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import argparse
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
@@ -7,7 +8,12 @@ from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from database import init_db
 from handlers import process_message, process_chat_member_update, check_access
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 dp = Dispatcher()
 
 @dp.message(CommandStart())
@@ -36,19 +42,27 @@ async def handle_my_chat_member(event: ChatMemberUpdated):
         return
 
 async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--verbose', action='store_true', help='Enable debug logging')
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose mode enabled")
+
     init_db(DB_PATH)
     bot = Bot(token=BOT_TOKEN)
 
     try:
-        logging.info("Bot started. Press Ctrl+C to stop.")
+        logger.info("Bot started. Press Ctrl+C to stop.")
         await dp.start_polling(bot)
     except KeyboardInterrupt:
-        logging.info("KeyboardInterrupt received")
+        logger.info("KeyboardInterrupt received")
     finally:
-        logging.info("Closing bot session...")
+        logger.info("Closing bot session...")
         await bot.session.close()
         await dp.storage.close()
-        logging.info("Bot stopped.")
+        logger.info("Bot stopped.")
 
 if __name__ == "__main__":
     try:
