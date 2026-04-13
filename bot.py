@@ -1,6 +1,7 @@
-import asyncio
-import logging
 import argparse
+import asyncio
+import json
+import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
@@ -27,6 +28,8 @@ async def cmd_start(message: Message):
 
 @dp.message()
 async def handle_message(message: Message):
+    logger.debug("Incoming Message: %s", json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
+
     is_allowed = await check_access(message)
     if not is_allowed:
         return
@@ -34,10 +37,14 @@ async def handle_message(message: Message):
 
 @dp.chat_member()
 async def handle_chat_member(event: ChatMemberUpdated):
+    logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
+
     await process_chat_member_update(event)
 
 @dp.my_chat_member()
 async def handle_my_chat_member(event: ChatMemberUpdated):
+    logger.debug("Incoming my ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
+
     if event.new_chat_member.status == "kicked":
         return
 
