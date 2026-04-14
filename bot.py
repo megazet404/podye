@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 dp = Dispatcher()
 
 @dp.message(CommandStart())
-async def cmd_start(message: types.Message, bot: types.Bot) -> None:
+async def cmd_start(message: Message, bot: Bot) -> None:
     if message.chat.type == "private":
         if not is_allowed_user(message.from_user.id):
             return # Silent ignore
         await message.answer("Окай.")
 
 @dp.message()
-async def handle_message(message: types.Message, bot: types.Bot) -> None:
+async def handle_message(message: Message, bot: Bot) -> None:
     logger.debug("Incoming Message: %s", json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     if not is_allowed_chat(message.chat.id):
@@ -41,13 +41,13 @@ async def handle_message(message: types.Message, bot: types.Bot) -> None:
     await process_message(message)
 
 @dp.chat_member()
-async def handle_chat_member(event: types.ChatMemberUpdated, bot: types.Bot) -> None:
+async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
     logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     await process_chat_member_update(event)
 
 @dp.my_chat_member()
-async def handle_my_chat_member(event: types.ChatMemberUpdated, bot: types.Bot) -> None:
+async def handle_my_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
     logger.debug("Incoming my ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     old_status = event.old_chat_member.status
