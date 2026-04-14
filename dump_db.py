@@ -78,7 +78,7 @@ def generate_html(data: Dict[str, Any]) -> str:
     # Section: Users
     html.append("<h1>Users</h1>")
     html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr bgcolor='#eeeeee'><th>User Info</th><th>Chat Memberships</th></tr>")
+    html.append("<tr bgcolor='#ddd'><th>User Info</th><th>Chat Memberships</th></tr>")
 
     for user in data.get("users_full", []):
         # User details cell
@@ -95,7 +95,7 @@ def generate_html(data: Dict[str, Any]) -> str:
         membership_rows = []
         if user['memberships']:
             membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
-            membership_rows.append("<tr bgcolor='#f9f9f9'><th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
+            membership_rows.append("<tr bgcolor='#eee'><th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
             for m in user['memberships']:
                 membership_rows.append(
                     f"<tr>"
@@ -115,7 +115,7 @@ def generate_html(data: Dict[str, Any]) -> str:
     # Section: Chats
     html.append("<h1>Chats</h1>")
     html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr bgcolor='#eeeeee'><th>Chat Info</th><th>Members</th></tr>")
+    html.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
 
     for chat in data.get("chats_full", []):
         chat_info = (
@@ -126,7 +126,7 @@ def generate_html(data: Dict[str, Any]) -> str:
             f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
         )
         member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
-        member_rows.append("<tr bgcolor='#f9f9f9'><th>User (ID)</th><th>Status</th><th>Joined</th><th>Last Activity</th></tr>")
+        member_rows.append("<tr bgcolor='#eee'><th>User (ID)</th><th>Status</th><th>Joined</th><th>Last Activity</th></tr>")
         for m in chat['members']:
             member_rows.append(
                 f"<tr>"
