@@ -1,7 +1,7 @@
 import sqlite3
 import json
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union
 
 def parse_date(date_str: str) -> int:
@@ -15,6 +15,12 @@ def parse_date(date_str: str) -> int:
         except ValueError:
             raise ValueError(f"Invalid date format: {date_str}")
 
+def format_timestamp(ts: Optional[int]) -> str:
+    """Converts Unix timestamp to human-readable UTC string."""
+    if ts is None:
+        return "N/A"
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
 def parse_chat_filter(chat_arg: str) -> Union[str, List[int]]:
     """Parses the --chat argument."""
     if chat_arg.lower() == 'none':
@@ -24,8 +30,7 @@ def parse_chat_filter(chat_arg: str) -> Union[str, List[int]]:
 
     # Parse comma-separated list of chat IDs
     try:
-        chat_ids = [int(x.strip()) for x in chat_arg.split(',')]
-        return chat_ids
+        return [int(x.strip()) for x in chat_arg.split(',')]
     except ValueError:
         raise ValueError(f"Invalid chat ID format: {chat_arg}")
 
@@ -38,77 +43,142 @@ def fetch_table_data(cursor: sqlite3.Cursor, table: str, where: Optional[str] = 
     columns = [description[0] for description in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-def dump_database(db_path: str, output_path: str, start_time: Optional[int], end_time: Optional[int], chat_filter: Union[str, List[int]]) -> None:
+def get_users_with_chats(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
+    """Fetches users and their associated chat memberships."""
+    users = fetch_table_data(cursor, "users")
+    for user in users:
+        cursor.execute("""
+            SELECT cm.*, c.title, c.type, c.username as chat_username
+            FROM chat_members cm
+            JOIN chats c ON cm.chat_id = c.id
+            WHERE cm.user_id = ?
+        """, (user['id'],))
+        columns = [description[0] for description in cursor.description]
+        user['memberships'] = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    return users
+
+def generate_html(data: Dict[str, Any]) -> str:
+    """Generates simple HTML for debugging."""
+    html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
+
+    # Section: Users
+    html.append("<h1>Users</h1>")
+    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
+    html.append("<tr><th>User Info</th><th>Chat Memberships</th></tr>")
+
+    for user in data.get("users_full", []):
+        # User details cell
+        user_info = (
+            f"<b>ID:</b> {user['id']}<br>"
+            f"<b>Username:</b> {user['username'] or 'N/A'}<br>"
+            f"<b>Name:</b> {user['first_name']} {user['last_name'] or ''}<br>"
+            f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
+            f"<b>Lang:</b> {user['language_code'] or 'N/A'}<br>"
+            f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
+        )
+
+        # Memberships cell with nested table
+        membership_rows = []
+        if user['memberships']:
+            membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
+            membership_rows.append("<tr><th>Chat Title (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
+            for m in user['memberships']:
+                membership_rows.append(
+                    f"<tr>"
+                    f"<td>{m['title'] or m['chat_username'] or 'Private'} ({m['chat_id']})</td>"
+                    f"<td>{m['status']}</td>"
+                    f"<td>{format_timestamp(m['joined_at'])}</td>"
+                    f"<td>{format_timestamp(m['first_activity'])} / {format_timestamp(m['last_activity'])}</td>"
+                    f"</tr>"
+                )
+            membership_rows.append("</table>")
+        else:
+            membership_rows.append("No active memberships found.")
+
+        html.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
+
+    html.append("</table>")
+    html.append("</body></html>")
+    return "\n".join(html)
+
+def dump_database(db_path: str, output_path: str, start_time: Optional[int],
+                  end_time: Optional[int], chat_filter: Union[str, List[int]],
+                  fmt: str) -> None:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     data = {}
 
-    # Dump reference tables (users, chats, chat_members) fully
-    data["users"] = fetch_table_data(cursor, "users")
-    data["chats"] = fetch_table_data(cursor, "chats")
-    data["chat_members"] = fetch_table_data(cursor, "chat_members")
-
-    # Dump messages with filters
-    if chat_filter == 'none':
-        data["messages"] = []
-        data["message_media"] = []
+    if fmt == 'html':
+        # Specific structure for HTML human-readable view
+        data["users_full"] = get_users_with_chats(cursor)
     else:
-        message_conditions = []
-        message_params = []
+        # Standard JSON flat structure
+        data["users"] = fetch_table_data(cursor, "users")
+        data["chats"] = fetch_table_data(cursor, "chats")
+        data["chat_members"] = fetch_table_data(cursor, "chat_members")
 
-        # Time filter
-        if start_time is not None and end_time is not None:
-            message_conditions.append("date >= ? AND date <= ?")
-            message_params.extend([start_time, end_time])
-        elif start_time is not None:
-            message_conditions.append("date >= ?")
-            message_params.append(start_time)
-        elif end_time is not None:
-            message_conditions.append("date <= ?")
-            message_params.append(end_time)
+        if chat_filter == 'none':
+            data["messages"] = []
+            data["message_media"] = []
+        else:
+            message_conditions = []
+            message_params = []
 
-        # Chat filter
-        if isinstance(chat_filter, list):
-            placeholders = ",".join("?" * len(chat_filter))
-            message_conditions.append(f"chat_id IN ({placeholders})")
-            message_params.extend(chat_filter)
+            # Time filter
+            if start_time is not None:
+                message_conditions.append("date >= ?")
+                message_params.append(start_time)
+            if end_time is not None:
+                message_conditions.append("date <= ?")
+                message_params.append(end_time)
 
-        message_where = " AND ".join(message_conditions) if message_conditions else None
+            # Chat filter
+            if isinstance(chat_filter, list):
+                placeholders = ",".join("?" * len(chat_filter))
+                message_conditions.append(f"chat_id IN ({placeholders})")
+                message_params.extend(chat_filter)
 
-        data["messages"] = fetch_table_data(cursor, "messages", message_where, tuple(message_params))
+            message_where = " AND ".join(message_conditions) if message_conditions else None
+
+            data["messages"] = fetch_table_data(cursor, "messages", message_where, tuple(message_params))
 
         # Dump media linked to selected messages
-        if data["messages"]:
-            message_ids = tuple(m["id"] for m in data["messages"])
-            placeholders = ",".join("?" * len(message_ids))
-            media_where = f"message_id IN ({placeholders})"
-            data["message_media"] = fetch_table_data(cursor, "message_media", media_where, message_ids)
-        else:
-            data["message_media"] = []
+            if data["messages"]:
+                m_ids = tuple(m["id"] for m in data["messages"])
+                data["message_media"] = fetch_table_data(
+                    cursor, "message_media",
+                    f"message_id IN ({','.join('?' * len(m_ids))})", m_ids
+                )
+            else:
+                data["message_media"] = []
 
     conn.close()
 
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        if fmt == 'html':
+            f.write(generate_html(data))
+        else:
+            json.dump(data, f, indent=2, ensure_ascii=False)
 
 def main():
-    parser = argparse.ArgumentParser(description="Dump SQLite database to JSON")
+    parser = argparse.ArgumentParser(description="Dump SQLite database to JSON or HTML")
     parser.add_argument("--db", required=True, help="Path to SQLite database file")
-    parser.add_argument("--output", required=True, help="Path to output JSON file")
+    parser.add_argument("--output", required=True, help="Path to output file")
+    parser.add_argument("--format", choices=['json', 'html'], default='json', help="Output format (default: json)")
     parser.add_argument("--start", help="Start time (Unix timestamp or ISO 8601)")
     parser.add_argument("--end", help="End time (Unix timestamp or ISO 8601)")
-    parser.add_argument("--chat", default="all", help="Chat filter: 'all', 'none', or comma-separated chat IDs (e.g., -100123,-100456)")
+    parser.add_argument("--chat", default="all", help="Chat filter: 'all', 'none', or comma-separated chat IDs")
 
     args = parser.parse_args()
 
-    start_time = parse_date(args.start) if args.start else None
-    end_time = parse_date(args.end) if args.end else None
-    chat_filter = parse_chat_filter(args.chat)
+    st = parse_date(args.start) if args.start else None
+    et = parse_date(args.end) if args.end else None
+    cf = parse_chat_filter(args.chat)
 
-    dump_database(args.db, args.output, start_time, end_time, chat_filter)
-    print(f"Database dumped to {args.output}")
+    dump_database(args.db, args.output, st, et, cf, args.format)
+    print(f"Database dumped to {args.output} in {args.format} format")
 
 if __name__ == "__main__":
     main()
