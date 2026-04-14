@@ -25,10 +25,17 @@ async def cmd_start(message: types.Message) -> None:
         await message.answer("Bot initialized")
 
 @dp.message()
-async def handle_message(message: types.Message) -> None:
+async def handle_message(message: types.Message, bot: types.Bot) -> None:
     logger.debug("Incoming Message: %s", json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     if not is_allowed_chat(message.chat.id):
+        if message.chat.type != "private":
+            try:
+                await bot.send_message(message.chat.id, "Unauthorized chat. Leaving.")
+                await bot.leave_chat(message.chat.id)
+                logger.info(f"Left unauthorized chat: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to leave chat {message.chat.id}: {e}")
         return
 
     await process_message(message)
