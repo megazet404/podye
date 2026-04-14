@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 dp = Dispatcher()
 
 @dp.message(CommandStart())
-async def cmd_start(message: types.Message) -> None:
+async def cmd_start(message: types.Message, bot: types.Bot) -> None:
     if message.chat.type == "private":
         if not is_allowed_user(message.from_user.id):
             return # Silent ignore
@@ -41,7 +41,7 @@ async def handle_message(message: types.Message, bot: types.Bot) -> None:
     await process_message(message)
 
 @dp.chat_member()
-async def handle_chat_member(event: types.ChatMemberUpdated) -> None:
+async def handle_chat_member(event: types.ChatMemberUpdated, bot: types.Bot) -> None:
     logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     await process_chat_member_update(event)
