@@ -83,9 +83,9 @@ def generate_html(data: Dict[str, Any]) -> str:
     for user in data.get("users_full", []):
         # User details cell
         user_info = (
-            f"<b>ID:</b> {user['id']}<br>"
+            f"<b>Name:</b> <u>{user['first_name']} {user['last_name'] or ''}</u><br>"
             f"<b>Username:</b> {user['username'] or 'N/A'}<br>"
-            f"<b>Name:</b> {user['first_name']} {user['last_name'] or ''}<br>"
+            f"<b>ID:</b> {user['id']}<br>"
             f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
             f"<b>Lang:</b> {user['language_code'] or 'N/A'}<br>"
             f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
@@ -119,9 +119,9 @@ def generate_html(data: Dict[str, Any]) -> str:
 
     for chat in data.get("chats_full", []):
         chat_info = (
-            f"<b>ID:</b> {chat['id']}<br>"
-            f"<b>Title:</b> {chat['title'] or 'N/A'}<br>"
+            f"<b>Title:</b> <u>{chat['title'] or 'N/A'}</u><br>"
             f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
+            f"<b>ID:</b> {chat['id']}<br>"
             f"<b>Type:</b> {chat['type']}<br>"
             f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
         )
