@@ -21,8 +21,8 @@
             <file name="database.py" role="Persistence layer">
                 Defines the SQLite schema and executes CRUD operations using UPSERT patterns to maintain data consistency for users and chats.
             </file>
-            <file name="dump_to_json.py" role="Maintenance utility">
-                CLI tool for exporting stored data into JSON format with support for temporal and chat-based filtering.
+            <file name="dump_db.py" role="Maintenance utility">
+                CLI tool for exporting stored data. Supports JSON format for programmatic use and HTML format for human-readable debugging. Includes relational data aggregation (Users with memberships, Chats with members).
             </file>
         </components>
     </architecture>
@@ -64,11 +64,21 @@
             6. Extract and store metadata for all media attachments.
             7. Update member activity timestamps.
         </message_processing>
+        <data_export>
+            <json_format>Flat representation of database tables for data migration or external processing.</json_format>
+            <html_format>
+                Relational representation for debugging:
+                - Users: Aggregated with their chat memberships and status.
+                - Chats: Aggregated with the list of participating users.
+                - Timestamps: Converted from Unix epoch to human-readable UTC format.
+            </html_format>
+        </data_export>
     </logic_flows>
 
     <operational_notes>
         <note>The system ignores messages from unauthorized sources silently or with a farewell message depending on chat type.</note>
         <note>Media files are not downloaded; only their metadata and Telegram file_ids are stored.</note>
         <note>SQLite WAL mode is used to ensure concurrency during polling and external dumping.</note>
+        <note>The HTML export format is strictly for manual debugging and audit, utilizing basic formatting without external dependencies (CSS/JS).</note>
     </operational_notes>
 </project_documentation>
