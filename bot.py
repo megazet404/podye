@@ -20,11 +20,9 @@ dp = Dispatcher()
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message) -> None:
     if message.chat.type == "private":
-        if is_allowed_user(message.from_user.id):
-            await message.answer("Bot initialized")
-        else:
-            await message.answer("Access denied")
-            return
+        if not is_allowed_user(message.from_user.id):
+            return # Silent ignore
+        await message.answer("Bot initialized")
 
 @dp.message()
 async def handle_message(message: types.Message) -> None:
@@ -42,11 +40,21 @@ async def handle_chat_member(event: types.ChatMemberUpdated) -> None:
     await process_chat_member_update(event)
 
 @dp.my_chat_member()
-async def handle_my_chat_member(event: types.ChatMemberUpdated) -> None:
+async def handle_my_chat_member(event: types.ChatMemberUpdated, bot: types.Bot) -> None:
     logger.debug("Incoming my ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
-    if event.new_chat_member.status == "kicked":
-        return
+    old_status = event.old_chat_member.status
+    new_status = event.new_chat_member.status
+
+    # Detect addition to chat (left -> member)
+    if old_status == "left" and new_status == "member":
+        if not is_allowed_chat(event.chat.id):
+            try:
+                await bot.send_message(event.chat.id, "Unauthorized chat. Leaving.")
+                await bot.leave_chat(event.chat.id)
+                logger.info(f"Left unauthorized chat: {event.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to leave chat {event.chat.id}: {e}")
 
 async def main():
     parser = argparse.ArgumentParser()
