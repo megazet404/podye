@@ -22,7 +22,7 @@ async def cmd_start(message: types.Message, bot: types.Bot) -> None:
     if message.chat.type == "private":
         if not is_allowed_user(message.from_user.id):
             return # Silent ignore
-        await message.answer("Bot initialized")
+        await message.answer("Окай.")
 
 @dp.message()
 async def handle_message(message: types.Message, bot: types.Bot) -> None:
@@ -31,7 +31,7 @@ async def handle_message(message: types.Message, bot: types.Bot) -> None:
     if not is_allowed_chat(message.chat.id):
         if message.chat.type != "private":
             try:
-                await bot.send_message(message.chat.id, "Unauthorized chat. Leaving.")
+                await bot.send_message(message.chat.id, "Всё, заебали. Я сваливаю отсюда, нахуй.")
                 await bot.leave_chat(message.chat.id)
                 logger.info(f"Left unauthorized chat: {message.chat.id}")
             except Exception as e:
@@ -53,11 +53,12 @@ async def handle_my_chat_member(event: types.ChatMemberUpdated, bot: types.Bot) 
     old_status = event.old_chat_member.status
     new_status = event.new_chat_member.status
 
-    # Detect addition to chat (left -> member)
-    if old_status == "left" and new_status == "member":
-        if not is_allowed_chat(event.chat.id):
+    if old_status != "member" and new_status == "member":
+        if is_allowed_chat(event.chat.id):
+            await bot.send_message(event.chat.id, "Вы кто такие? Я ва... А, это вы? Ну что ж, готов быть вашим маленьким вредным пидором.")
+        else:
             try:
-                await bot.send_message(event.chat.id, "Unauthorized chat. Leaving.")
+                await bot.send_message(event.chat.id, "Вы кто такие? Я вас не звал! Идите нахуй!")
                 await bot.leave_chat(event.chat.id)
                 logger.info(f"Left unauthorized chat: {event.chat.id}")
             except Exception as e:
