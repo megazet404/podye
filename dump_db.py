@@ -53,9 +53,23 @@ def get_users_with_chats(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
             JOIN chats c ON cm.chat_id = c.id
             WHERE cm.user_id = ?
         """, (user['id'],))
-        columns = [description[0] for description in cursor.description]
-        user['memberships'] = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        cols = [d[0] for d in cursor.description]
+        user['memberships'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
     return users
+
+def get_chats_with_members(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
+    """Fetches chats and their associated members."""
+    chats = fetch_table_data(cursor, "chats")
+    for chat in chats:
+        cursor.execute("""
+            SELECT cm.*, u.username, u.first_name, u.last_name
+            FROM chat_members cm
+            JOIN users u ON cm.user_id = u.id
+            WHERE cm.chat_id = ?
+        """, (chat['id'],))
+        cols = [d[0] for d in cursor.description]
+        chat['members'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return chats
 
 def generate_html(data: Dict[str, Any]) -> str:
     """Generates simple HTML for debugging."""
@@ -64,7 +78,7 @@ def generate_html(data: Dict[str, Any]) -> str:
     # Section: Users
     html.append("<h1>Users</h1>")
     html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr><th>User Info</th><th>Chat Memberships</th></tr>")
+    html.append("<tr bgcolor='#eeeeee'><th>User Info</th><th>Chat Memberships</th></tr>")
 
     for user in data.get("users_full", []):
         # User details cell
@@ -81,14 +95,14 @@ def generate_html(data: Dict[str, Any]) -> str:
         membership_rows = []
         if user['memberships']:
             membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
-            membership_rows.append("<tr><th>Chat Title (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
+            membership_rows.append("<tr bgcolor='#f9f9f9'><th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
             for m in user['memberships']:
                 membership_rows.append(
                     f"<tr>"
                     f"<td>{m['title'] or m['chat_username'] or 'Private'} ({m['chat_id']})</td>"
                     f"<td>{m['status']}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
-                    f"<td>{format_timestamp(m['first_activity'])} / {format_timestamp(m['last_activity'])}</td>"
+                        f"<td>{format_timestamp(m['first_activity'])} / {format_timestamp(m['last_activity'])}</td>"
                     f"</tr>"
                 )
             membership_rows.append("</table>")
@@ -96,6 +110,34 @@ def generate_html(data: Dict[str, Any]) -> str:
             membership_rows.append("No active memberships found.")
 
         html.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
+    html.append("</table>")
+
+    # Section: Chats
+    html.append("<h1>Chats</h1>")
+    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
+    html.append("<tr bgcolor='#eeeeee'><th>Chat Info</th><th>Members</th></tr>")
+
+    for chat in data.get("chats_full", []):
+        chat_info = (
+            f"<b>ID:</b> {chat['id']}<br>"
+            f"<b>Title:</b> {chat['title'] or 'N/A'}<br>"
+            f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
+            f"<b>Type:</b> {chat['type']}<br>"
+            f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+        )
+        member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
+        member_rows.append("<tr bgcolor='#f9f9f9'><th>User (ID)</th><th>Status</th><th>Joined</th><th>Last Activity</th></tr>")
+        for m in chat['members']:
+            member_rows.append(
+                f"<tr>"
+                f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or 'N/A'}</td>"
+                f"<td>{m['status']}</td>"
+                f"<td>{format_timestamp(m['joined_at'])}</td>"
+                f"<td>{format_timestamp(m['last_activity'])}</td>"
+                f"</tr>"
+            )
+        member_rows.append("</table>")
+        html.append(f"<tr><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
 
     html.append("</table>")
     html.append("</body></html>")
@@ -113,6 +155,7 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
     if fmt == 'html':
         # Specific structure for HTML human-readable view
         data["users_full"] = get_users_with_chats(cursor)
+        data["chats_full"] = get_chats_with_members(cursor)
     else:
         # Standard JSON flat structure
         data["users"] = fetch_table_data(cursor, "users")
