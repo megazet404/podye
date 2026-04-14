@@ -1,0 +1,74 @@
+<project_documentation version="1.0" target_audience="Large Language Model (LLM)">
+    <identity>
+        <name>Telegram Logger Bot</name>
+        <purpose>
+            Asynchronous system designed for monitoring, filtering, and persisting Telegram message data, media metadata, and user/chat interactions into a structured SQLite database.
+        </purpose>
+    </identity>
+
+    <architecture>
+        <environment>Python 3.10+, aiogram 3.x, SQLite 3 (WAL mode).</environment>
+        <components>
+            <file name="main.py" role="Entry point">
+                Initializes the Dispatcher, handles bot polling, and implements high-level access control. Directs unauthorized chats to a "leave" procedure.
+            </file>
+            <file name="config.py" role="Configuration manager">
+                Loads environment variables and JSON configurations. Normalizes Telegram Chat IDs to the standard Bot API format (-100...).
+            </file>
+            <file name="handlers.py" role="Data extractor">
+                Contains logic for parsing incoming Message and ChatMemberUpdated objects. Extracts text, media metadata (photos, videos, documents, voice), and forward origins.
+            </file>
+            <file name="database.py" role="Persistence layer">
+                Defines the SQLite schema and executes CRUD operations using UPSERT patterns to maintain data consistency for users and chats.
+            </file>
+            <file name="dump_to_json.py" role="Maintenance utility">
+                CLI tool for exporting stored data into JSON format with support for temporal and chat-based filtering.
+            </file>
+        </components>
+    </architecture>
+
+    <database_schema>
+        <table name="users">
+            <description>Stores unique Telegram users.</description>
+            <fields>id (PK), username, first_name, last_name, is_bot, language_code, updated_at.</fields>
+        </table>
+        <table name="chats">
+            <description>Stores Telegram groups, supergroups, channels, and private chats.</description>
+            <fields>id (PK), type, title, username, description, updated_at.</fields>
+        </table>
+        <table name="messages">
+            <description>Primary log of all captured messages.</description>
+            <fields>id (PK), tg_id, chat_id (FK), sender_id, reply_to_local_id, forward_sender_id, forward_message_id, forward_sender_name, text, entities (JSON), media_group_id, date, edit_date.</fields>
+        </table>
+        <table name="message_media">
+            <description>Metadata for files attached to messages.</description>
+            <fields>id (PK), message_id (FK), file_id, file_unique_id, file_type, file_size, mime_type, width, height.</fields>
+        </table>
+        <table name="chat_members">
+            <description>Intersection table tracking user activity and status within specific chats.</description>
+            <fields>chat_id (PK), user_id (PK), status, joined_at, left_at, first_activity, last_activity, updated_at.</fields>
+        </table>
+    </database_schema>
+
+    <logic_flows>
+        <access_control>
+            <private_chats>Only users defined in ALLOWED_USERS are processed.</private_chats>
+            <group_chats>Only chat IDs defined in ALLOWED_CHATS are processed. Unauthorized groups trigger an automated "leave chat" sequence.</group_chats>
+        </access_control>
+        <message_processing>
+            1. Validate source chat/user against whitelist.
+            2. Upsert chat and sender (user or sender_chat) info.
+            3. Resolve local ID of the replied-to message if applicable.
+            4. Parse forward origins (user, hidden user, chat, or channel).
+            5. Persist message text and entities.
+            6. Extract and store metadata for all media attachments.
+            7. Update member activity timestamps.
+        </message_processing>
+    </logic_flows>
+
+    <operational_notes>
+        <note>The system ignores messages from unauthorized sources silently or with a farewell message depending on chat type.</note>
+        <note>Media files are not downloaded; only their metadata and Telegram file_ids are stored.</note>
+        <note>SQLite WAL mode is used to ensure concurrency during polling and external dumping.</note>
+    </operational_notes>
+</project_documentation>
