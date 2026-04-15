@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
 from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from database import init_db
-from handlers import process_message, process_chat_member_update, is_allowed_chat, is_allowed_user
+from handlers import process_message, process_edited_message, process_chat_member_update, is_allowed_chat, is_allowed_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +39,16 @@ async def handle_message(message: Message, bot: Bot) -> None:
         return
 
     await process_message(message)
+
+@dp.edited_message()
+async def handle_edited_message(message: Message) -> None:
+    logger.debug("Incoming Edited Message: %s", 
+                 json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
+
+    if not is_allowed_chat(message.chat.id):
+        return
+
+    await process_edited_message(message)
 
 @dp.chat_member()
 async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:

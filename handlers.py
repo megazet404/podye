@@ -7,8 +7,9 @@ from aiogram.types import ChatMemberUpdated
 from database import (
     get_db_connection, upsert_user, upsert_chat, insert_message,
     insert_media, update_chat_member_activity, update_chat_member_status,
-    get_local_message_id
+    get_local_message_id, update_message_text  # Добавлена функция
 )
+
 from config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
 
 logger = logging.getLogger(__name__)
@@ -215,6 +216,35 @@ async def process_message(message: types.Message) -> None:
                 "left", timestamp, is_left=True
             )
 
+    finally:
+        conn.close()
+
+# handlers.py
+
+# handlers.py
+
+async def process_edited_message(message: types.Message) -> None:
+    logger.debug(f"Processing edited message {message.message_id} from chat {message.chat.id}")
+
+    current_text = message.text or message.caption
+    
+    entities_list = message.entities or message.caption_entities
+    entities_json = (
+        json.dumps([e.model_dump() for e in entities_list]) 
+        if entities_list else None
+    )
+
+    message_data = {
+        "tg_id": message.message_id,
+        "chat_id": message.chat.id,
+        "text": current_text,
+        "edit_date": message.edit_date,
+        "entities": entities_json
+    }
+
+    conn = get_db_connection(DB_PATH)
+    try:
+        update_message_text(conn, message_data)
     finally:
         conn.close()
 

@@ -41,6 +41,7 @@ def init_db(db_path: str) -> None:
         forward_sender_id INTEGER,
         forward_message_id INTEGER,
         forward_sender_name TEXT,
+        original_text TEXT,
         text TEXT,
         entities TEXT,
         media_group_id TEXT,
@@ -137,8 +138,8 @@ def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
     cursor.execute("""
     INSERT OR IGNORE INTO messages
     (tg_id, chat_id, sender_id, reply_to_local_id, forward_sender_id,
-     forward_message_id, forward_sender_name, text, entities, media_group_id, date, edit_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     forward_message_id, forward_sender_name, original_text, text, entities, media_group_id, date, edit_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         message_data.get("tg_id"),
         message_data.get("chat_id"),
@@ -147,6 +148,7 @@ def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
         message_data.get("forward_sender_id"),
         message_data.get("forward_message_id"),
         message_data.get("forward_sender_name"),
+        message_data.get("text"),
         message_data.get("text"),
         message_data.get("entities"),
         message_data.get("media_group_id"),
@@ -229,6 +231,22 @@ def update_chat_member_status(conn: sqlite3.Connection, chat_id: int, user_id: i
         """, (chat_id, user_id, status, timestamp, timestamp))
     conn.commit()
     logger.debug(f"Member Status UPDATE: chat={chat_id}, user={user_id}, status={status}")
+
+def update_message_text(conn: sqlite3.Connection, message_data: dict) -> None:
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE messages
+    SET text = ?, edit_date = ?, entities = ?
+    WHERE tg_id = ? AND chat_id = ?
+    """, (
+        message_data.get("text"),
+        message_data.get("edit_date"),
+        message_data.get("entities"),
+        message_data.get("tg_id"),
+        message_data.get("chat_id")
+    ))
+    conn.commit()
+    logger.debug(f"DB Update: tg_id {message_data.get('tg_id')} in chat {message_data.get('chat_id')}")
 
 def get_local_message_id(conn: sqlite3.Connection, tg_id: int, chat_id: int) -> Optional[int]:
     cursor = conn.cursor()
