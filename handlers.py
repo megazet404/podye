@@ -207,6 +207,7 @@ async def process_message(message: types.Message) -> None:
             for member in message.new_chat_members:
                 upsert_user(conn, extract_user_data(member), timestamp)
                 update_chat_member_status(conn, chat_id, member.id, "member", timestamp)
+                update_chat_member_activity(conn, chat_id, member.id, timestamp)
 
         if message.left_chat_member:
             update_chat_member_status(
@@ -234,6 +235,9 @@ async def process_chat_member_update(event: ChatMemberUpdated) -> None:
 
         is_left = new_status in ["left", "kicked"]
         update_chat_member_status(conn, chat_id, user_id, new_status, timestamp, is_left)
+
+        if not is_left:
+            update_chat_member_activity(conn, chat_id, user_id, timestamp, new_status)
 
     finally:
         conn.close()
