@@ -73,31 +73,97 @@ def get_chats_with_members(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
 
 def generate_html(data: Dict[str, Any]) -> str:
     """Generates simple HTML for debugging."""
-    html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
 
-    # Section: Users
-    html.append("<h1>Users</h1>")
-    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr bgcolor='#ddd'><th>User Info</th><th>Chat Memberships</th></tr>")
+    def generate_users(users_data: List[Dict[str, Any]]) -> str:
+        """Sub-function to generate the Users section."""
+        html_segment = []
+        html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+        html_segment.append("<tr bgcolor='#ddd'><th>User Info</th><th>Chat Memberships</th></tr>")
 
-    for user in data.get("users_full", []):
-        # User details cell
-        user_info = (
-            f"<b>Name:</b> <u>{user['first_name']} {user['last_name'] or ''}</u><br>"
-            f"<b>Username:</b> {user['username'] or 'N/A'}<br>"
-            f"<b>ID:</b> {user['id']}<br>"
-            f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
-            f"<b>Lang:</b> {user['language_code'] or 'N/A'}<br>"
-            f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
-        )
+        for user in users_data:
+            user_info = (
+                f"<b>Name:</b> <u>{user['first_name']} {user['last_name'] or ''}</u><br>"
+                f"<b>Username:</b> {user['username'] or 'N/A'}<br>"
+                f"<b>ID:</b> {user['id']}<br>"
+                f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
+                f"<b>Lang:</b> {user['language_code'] or 'N/A'}<br>"
+                f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
+            )
 
-        # Memberships cell with nested table
-        membership_rows = []
-        if user['memberships']:
-            membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
-            membership_rows.append(
+            # Memberships cell with nested table
+            membership_rows = []
+            if user['memberships']:
+                membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
+                membership_rows.append(
+                    "<tr bgcolor='#eee'>"
+                    "<th>Chat (ID)</th>"
+                    "<th>Status</th>"
+                    "<th>Joined</th>"
+                    "<th>Left</th>"
+                    "<th>First Activity</th>"
+                    "<th>Last Activity</th>"
+                    "<th>Updated</th>"
+                    "</tr>"
+                )
+                for m in user['memberships']:
+                    membership_rows.append(
+                        f"<tr>"
+                        f"<td>{m['title'] or m['chat_username'] or 'Private'} ({m['chat_id']})</td>"
+                        f"<td>{m['status']}</td>"
+                        f"<td>{format_timestamp(m['joined_at'])}</td>"
+                        f"<td>{format_timestamp(m['left_at'])}</td>"
+                        f"<td>{format_timestamp(m['first_activity'])}</td>"
+                        f"<td>{format_timestamp(m['last_activity'])}</td>"
+                        f"<td>{format_timestamp(m['updated_at'])}</td>"
+                        f"</tr>"
+                    )
+                membership_rows.append("</table>")
+            else:
+                membership_rows.append("No active memberships found.")
+
+            html_segment.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
+
+        html_segment.append("</table>")
+        return "".join(html_segment)
+
+    def generate_chats(chats_data: List[Dict[str, Any]]) -> str:
+        """Sub-function to generate the Users section."""
+
+        private_chats = [c for c in chats_data if c['type'] == 'private']
+        group_chats   = [c for c in chats_data if c['type'] != 'private']
+
+        html_segment  = []
+
+        # Section: Private Chats
+        html_segment.append("<h2>Private</h2>")
+        html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+        html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
+        for chat in private_chats:
+            chat_info = (
+                f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
+                f"<b>ID:</b> {chat['id']}<br>"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+            )
+            html_segment.append(f"<tr><td valign='top'>{chat_info}</td></tr>")
+        html_segment.append("</table>")
+    
+        # Section: Group Chats
+        html_segment.append("<h2>Groups / Channels</h2>")
+        html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+        html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
+    
+        for chat in group_chats:
+            chat_info = (
+                f"<b>Title:</b> <u>{chat['title'] or 'N/A'}</u><br>"
+                f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
+                f"<b>ID:</b> {chat['id']}<br>"
+                f"<b>Type:</b> {chat['type']}<br>"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+            )
+            member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
+            member_rows.append(
                 "<tr bgcolor='#eee'>"
-                "<th>Chat (ID)</th>"
+                "<th>User (ID)</th>"
                 "<th>Status</th>"
                 "<th>Joined</th>"
                 "<th>Left</th>"
@@ -106,10 +172,10 @@ def generate_html(data: Dict[str, Any]) -> str:
                 "<th>Updated</th>"
                 "</tr>"
             )
-            for m in user['memberships']:
-                membership_rows.append(
+            for m in chat['members']:
+                member_rows.append(
                     f"<tr>"
-                    f"<td>{m['title'] or m['chat_username'] or 'Private'} ({m['chat_id']})</td>"
+                    f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or 'N/A'}</td>"
                     f"<td>{m['status']}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
                     f"<td>{format_timestamp(m['left_at'])}</td>"
@@ -118,72 +184,20 @@ def generate_html(data: Dict[str, Any]) -> str:
                     f"<td>{format_timestamp(m['updated_at'])}</td>"
                     f"</tr>"
                 )
-            membership_rows.append("</table>")
-        else:
-            membership_rows.append("No active memberships found.")
+            member_rows.append("</table>")
+            html_segment.append(f"<tr><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
+    
+        html_segment.append("</table>")
+        return "".join(html_segment)
 
-        html.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
-    html.append("</table>")
+    html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
 
-    all_chats = data.get("chats_full", [])
-    private_chats = [c for c in all_chats if c['type'] == 'private']
-    group_chats = [c for c in all_chats if c['type'] != 'private']
+    html.append("<h1>Users</h1>")
+    html.append(generate_users(data.get("users_full", [])))
 
-    # Section: Private Chats
     html.append("<h1>Chats</h1>")
-    html.append("<h2>Private</h2>")
-    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
-    for chat in private_chats:
-        chat_info = (
-            f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
-            f"<b>ID:</b> {chat['id']}<br>"
-            f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
-        )
-        html.append(f"<tr><td valign='top'>{chat_info}</td></tr>")
-    html.append("</table>")
+    html.append(generate_chats(data.get("chats_full", [])))
 
-    # Section: Group Chats
-    html.append("<h2>Groups / Channels</h2>")
-    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
-    html.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
-
-    for chat in group_chats:
-        chat_info = (
-            f"<b>Title:</b> <u>{chat['title'] or 'N/A'}</u><br>"
-            f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
-            f"<b>ID:</b> {chat['id']}<br>"
-            f"<b>Type:</b> {chat['type']}<br>"
-            f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
-        )
-        member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
-        member_rows.append(
-            "<tr bgcolor='#eee'>"
-            "<th>User (ID)</th>"
-            "<th>Status</th>"
-            "<th>Joined</th>"
-            "<th>Left</th>"
-            "<th>First Activity</th>"
-            "<th>Last Activity</th>"
-            "<th>Updated</th>"
-            "</tr>"
-        )
-        for m in chat['members']:
-            member_rows.append(
-                f"<tr>"
-                f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or 'N/A'}</td>"
-                f"<td>{m['status']}</td>"
-                f"<td>{format_timestamp(m['joined_at'])}</td>"
-                f"<td>{format_timestamp(m['left_at'])}</td>"
-                f"<td>{format_timestamp(m['first_activity'])}</td>"
-                f"<td>{format_timestamp(m['last_activity'])}</td>"
-                f"<td>{format_timestamp(m['updated_at'])}</td>"
-                f"</tr>"
-            )
-        member_rows.append("</table>")
-        html.append(f"<tr><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
-
-    html.append("</table>")
     html.append("</body></html>")
     return "\n".join(html)
 
