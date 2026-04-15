@@ -157,7 +157,14 @@ def generate_html(data: Dict[str, Any]) -> str:
             f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
         )
         member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
-        member_rows.append("<tr bgcolor='#eee'><th>User (ID)</th><th>Status</th><th>Joined</th><th>Last Activity</th></tr>")
+        member_rows.append(
+            "<tr bgcolor='#eee'>"
+            "<th>User (ID)</th>"
+            "<th>Status</th>"
+            "<th>Joined</th>"
+            "<th>Last Activity</th>"
+            "</tr>"
+        )
         for m in chat['members']:
             member_rows.append(
                 f"<tr>"
