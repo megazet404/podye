@@ -162,7 +162,10 @@ def generate_html(data: Dict[str, Any]) -> str:
             "<th>User (ID)</th>"
             "<th>Status</th>"
             "<th>Joined</th>"
+            "<th>Left</th>"
+            "<th>First Activity</th>"
             "<th>Last Activity</th>"
+            "<th>Updated</th>"
             "</tr>"
         )
         for m in chat['members']:
@@ -171,7 +174,10 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or 'N/A'}</td>"
                 f"<td>{m['status']}</td>"
                 f"<td>{format_timestamp(m['joined_at'])}</td>"
+                f"<td>{format_timestamp(m['left_at'])}</td>"
+                f"<td>{format_timestamp(m['first_activity'])}</td>"
                 f"<td>{format_timestamp(m['last_activity'])}</td>"
+                f"<td>{format_timestamp(m['updated_at'])}</td>"
                 f"</tr>"
             )
         member_rows.append("</table>")
