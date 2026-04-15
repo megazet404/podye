@@ -108,7 +108,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 for m in user['memberships']:
                     membership_rows.append(
                         f"<tr>"
-                        f"<td>{m['title'] or '-'} @{m['chat_username'] or '-'} ({m['chat_id']})</td>"
+                        f"<td>{m['title'] or '-'} ({m['chat_id']})<br/>@{m['chat_username'] or '-'}</td>"
                         f"<td>{m['status']}</td>"
                         f"<td>{format_timestamp(m['joined_at'])}</td>"
                         f"<td>{format_timestamp(m['left_at'])}</td>"
