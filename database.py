@@ -1,7 +1,7 @@
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -240,3 +240,67 @@ def get_db_connection(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+def fetch_table_data(conn: sqlite3.Connection, table: str, where: Optional[str] = None, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
+    """Fetches all rows from a table as dictionaries."""
+    cursor = conn.cursor()
+    query = f"SELECT * FROM {table}"
+    if where:
+        query += f" WHERE {where}"
+    cursor.execute(query, params or ())
+    columns = [description[0] for description in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+def get_users_with_chats(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Fetches users and their associated chat memberships with display names."""
+    users = fetch_table_data(conn, "users")
+    cursor = conn.cursor()
+    for user in users:
+        cursor.execute("""
+            SELECT cm.*, c.title, c.type, c.username as chat_username,
+                   u.first_name as chat_fname, u.last_name as chat_lname
+            FROM chat_members cm
+            JOIN chats c ON cm.chat_id = c.id
+            LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
+            WHERE cm.user_id = ?
+        """, (user['id'],))
+        cols = [d[0] for d in cursor.description]
+        memberships = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        for m in memberships:
+            if m['type'] == 'private':
+                name = f"{m['chat_fname'] or ''} {m['chat_lname'] or ''}".strip()
+                m['display_name'] = name or f"User {m['chat_id']}"
+            else:
+                m['display_name'] = m['title'] or f"Group {m['chat_id']}"
+
+        user['memberships'] = memberships
+    return users
+
+def get_chats_with_members(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Fetches chats with display names and their associated members."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT c.*, u.first_name, u.last_name
+        FROM chats c
+        LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
+    """)
+    columns = [description[0] for description in cursor.description]
+    chats = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for chat in chats:
+        if chat['type'] == 'private':
+            name = f"{chat['first_name'] or ''} {chat['last_name'] or ''}".strip()
+            chat['display_name'] = name or f"User {chat['id']}"
+        else:
+            chat['display_name'] = chat['title'] or f"Group {chat['id']}"
+
+        cursor.execute("""
+            SELECT cm.*, u.username, u.first_name, u.last_name
+            FROM chat_members cm
+            JOIN users u ON cm.user_id = u.id
+            WHERE cm.chat_id = ?
+        """, (chat['id'],))
+        cols = [d[0] for d in cursor.description]
+        chat['members'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return chats

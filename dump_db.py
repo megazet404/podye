@@ -1,8 +1,8 @@
-import sqlite3
 import json
 import argparse
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union
+from database import get_db_connection, fetch_table_data, get_users_with_chats, get_chats_with_members
 
 def parse_date(date_str: str) -> int:
     """Converts ISO 8601 or Unix timestamp to Unix timestamp."""
@@ -33,67 +33,6 @@ def parse_chat_filter(chat_arg: str) -> Union[str, List[int]]:
         return [int(x.strip()) for x in chat_arg.split(',')]
     except ValueError:
         raise ValueError(f"Invalid chat ID format: {chat_arg}")
-
-def fetch_table_data(cursor: sqlite3.Cursor, table: str, where: Optional[str] = None, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
-    """Fetches all rows from a table as dictionaries."""
-    query = f"SELECT * FROM {table}"
-    if where:
-        query += f" WHERE {where}"
-    cursor.execute(query, params or ())
-    columns = [description[0] for description in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-def get_users_with_chats(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
-    """Fetches users and their associated chat memberships with display names."""
-    users = fetch_table_data(cursor, "users")
-    for user in users:
-        cursor.execute("""
-            SELECT cm.*, c.title, c.type, c.username as chat_username,
-                   u.first_name as chat_fname, u.last_name as chat_lname
-            FROM chat_members cm
-            JOIN chats c ON cm.chat_id = c.id
-            LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
-            WHERE cm.user_id = ?
-        """, (user['id'],))
-        cols = [d[0] for d in cursor.description]
-        memberships = [dict(zip(cols, row)) for row in cursor.fetchall()]
-
-        for m in memberships:
-            if m['type'] == 'private':
-                name = f"{m['chat_fname'] or ''} {m['chat_lname'] or ''}".strip()
-                m['display_name'] = name or f"User {m['chat_id']}"
-            else:
-                m['display_name'] = m['title'] or f"Group {m['chat_id']}"
-
-        user['memberships'] = memberships
-    return users
-
-def get_chats_with_members(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
-    """Fetches chats with display names and their associated members."""
-    cursor.execute("""
-        SELECT c.*, u.first_name, u.last_name
-        FROM chats c
-        LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
-    """)
-    columns = [description[0] for description in cursor.description]
-    chats = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    for chat in chats:
-        if chat['type'] == 'private':
-            name = f"{chat['first_name'] or ''} {chat['last_name'] or ''}".strip()
-            chat['display_name'] = name or f"User {chat['id']}"
-        else:
-            chat['display_name'] = chat['title'] or f"Group {chat['id']}"
-
-        cursor.execute("""
-            SELECT cm.*, u.username, u.first_name, u.last_name
-            FROM chat_members cm
-            JOIN users u ON cm.user_id = u.id
-            WHERE cm.chat_id = ?
-        """, (chat['id'],))
-        cols = [d[0] for d in cursor.description]
-        chat['members'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
-    return chats
 
 def generate_html(data: Dict[str, Any]) -> str:
     """Generates simple HTML for debugging."""
@@ -229,21 +168,16 @@ def generate_html(data: Dict[str, Any]) -> str:
 def dump_database(db_path: str, output_path: str, start_time: Optional[int],
                   end_time: Optional[int], chat_filter: Union[str, List[int]],
                   fmt: str) -> None:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
+    conn = get_db_connection(db_path)
     data = {}
 
     if fmt == 'html':
-        # Specific structure for HTML human-readable view
-        data["users_full"] = get_users_with_chats(cursor)
-        data["chats_full"] = get_chats_with_members(cursor)
+        data["users_full"] = get_users_with_chats(conn)
+        data["chats_full"] = get_chats_with_members(conn)
     else:
-        # Standard JSON flat structure
-        data["users"] = fetch_table_data(cursor, "users")
-        data["chats"] = fetch_table_data(cursor, "chats")
-        data["chat_members"] = fetch_table_data(cursor, "chat_members")
+        data["users"] = fetch_table_data(conn, "users")
+        data["chats"] = fetch_table_data(conn, "chats")
+        data["chat_members"] = fetch_table_data(conn, "chat_members")
 
         if chat_filter == 'none':
             data["messages"] = []
@@ -267,14 +201,13 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
                 message_params.extend(chat_filter)
 
             message_where = " AND ".join(message_conditions) if message_conditions else None
+            data["messages"] = fetch_table_data(conn, "messages", message_where, tuple(message_params))
 
-            data["messages"] = fetch_table_data(cursor, "messages", message_where, tuple(message_params))
-
-        # Dump media linked to selected messages
+            # Dump media linked to selected messages
             if data["messages"]:
                 m_ids = tuple(m["id"] for m in data["messages"])
                 data["message_media"] = fetch_table_data(
-                    cursor, "message_media",
+                    conn, "message_media",
                     f"message_id IN ({','.join('?' * len(m_ids))})", m_ids
                 )
             else:

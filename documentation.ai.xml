@@ -18,11 +18,13 @@
             <file name="handlers.py" role="Data extractor">
                 Contains logic for parsing incoming Message and ChatMemberUpdated objects. Extracts text, media metadata (photos, videos, documents, voice), and forward origins.
             </file>
-            <file name="database.py" role="Persistence layer">
-                Defines the SQLite schema and executes CRUD operations using UPSERT patterns to maintain data consistency for users and chats.
+            <file name="database.py" role="Persistence and Aggregation layer">
+                1. Defines the SQLite schema.
+                2. Executes CRUD operations using UPSERT patterns to maintain data consistency for users and chats.
+                3. Provides complex data aggregation logic for reporting and exports.
             </file>
             <file name="dump_db.py" role="Maintenance utility">
-                CLI tool for exporting stored data. Supports JSON format for programmatic use and HTML format for human-readable debugging. Includes relational data aggregation (Users with memberships, Chats with members).
+                CLI tool for exporting stored data. Supports JSON format for programmatic use and HTML format for human-readable debugging. Delegates data retrieval and relational aggregation to database.py.
             </file>
         </components>
     </architecture>
@@ -65,6 +67,7 @@
             7. Update member activity timestamps.
         </message_processing>
         <data_export>
+            <retrieval>Data aggregation is handled by the persistence layer to ensure consistency between the bot and maintenance tools.</retrieval>
             <json_format>Flat representation of database tables for data migration or external processing.</json_format>
             <html_format>
                 Relational representation for debugging:
