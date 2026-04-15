@@ -97,8 +97,13 @@ def generate_html(data: Dict[str, Any]) -> str:
             membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
             membership_rows.append(
                 "<tr bgcolor='#eee'>"
-                "<th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Left</th>"
-                "<th>First Activity</th><th>Last Activity</th><th>Updated</th>"
+                "<th>Chat (ID)</th>"
+                "<th>Status</th>"
+                "<th>Joined</th>"
+                "<th>Left</th>"
+                "<th>First Activity</th>"
+                "<th>Last Activity</th>"
+                "<th>Updated</th>"
                 "</tr>"
             )
             for m in user['memberships']:
