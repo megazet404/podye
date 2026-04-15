@@ -22,7 +22,7 @@ async def cmd_start(message: Message, bot: Bot) -> None:
     if message.chat.type == "private":
         if not is_allowed_user(message.from_user.id):
             return # Silent ignore
-        await message.answer("Окай.")
+        await message.answer("Поехали.")
 
 @dp.message()
 async def handle_message(message: Message, bot: Bot) -> None:
