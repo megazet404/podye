@@ -95,14 +95,22 @@ def generate_html(data: Dict[str, Any]) -> str:
         membership_rows = []
         if user['memberships']:
             membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
-            membership_rows.append("<tr bgcolor='#eee'><th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Activity (F/L)</th></tr>")
+            membership_rows.append(
+                "<tr bgcolor='#eee'>"
+                "<th>Chat (ID)</th><th>Status</th><th>Joined</th><th>Left</th>"
+                "<th>First Activity</th><th>Last Activity</th><th>Updated</th>"
+                "</tr>"
+            )
             for m in user['memberships']:
                 membership_rows.append(
                     f"<tr>"
                     f"<td>{m['title'] or m['chat_username'] or 'Private'} ({m['chat_id']})</td>"
                     f"<td>{m['status']}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
-                        f"<td>{format_timestamp(m['first_activity'])} / {format_timestamp(m['last_activity'])}</td>"
+                    f"<td>{format_timestamp(m['left_at'])}</td>"
+                    f"<td>{format_timestamp(m['first_activity'])}</td>"
+                    f"<td>{format_timestamp(m['last_activity'])}</td>"
+                    f"<td>{format_timestamp(m['updated_at'])}</td>"
                     f"</tr>"
                 )
             membership_rows.append("</table>")
