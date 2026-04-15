@@ -125,12 +125,30 @@ def generate_html(data: Dict[str, Any]) -> str:
         html.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
     html.append("</table>")
 
-    # Section: Chats
+    all_chats = data.get("chats_full", [])
+    private_chats = [c for c in all_chats if c['type'] == 'private']
+    group_chats = [c for c in all_chats if c['type'] != 'private']
+
+    # Section: Private Chats
     html.append("<h1>Chats</h1>")
+    html.append("<h2>Private</h2>")
+    html.append("<table border='1' cellspacing='0' cellpadding='5'>")
+    html.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
+    for chat in private_chats:
+        chat_info = (
+            f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
+            f"<b>ID:</b> {chat['id']}<br>"
+            f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+        )
+        html.append(f"<tr><td valign='top'>{chat_info}</td></tr>")
+    html.append("</table>")
+
+    # Section: Group Chats
+    html.append("<h2>Groups / Channels</h2>")
     html.append("<table border='1' cellspacing='0' cellpadding='5'>")
     html.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
 
-    for chat in data.get("chats_full", []):
+    for chat in group_chats:
         chat_info = (
             f"<b>Title:</b> <u>{chat['title'] or 'N/A'}</u><br>"
             f"<b>Username:</b> {chat['username'] or 'N/A'}<br>"
