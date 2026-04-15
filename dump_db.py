@@ -44,23 +44,47 @@ def fetch_table_data(cursor: sqlite3.Cursor, table: str, where: Optional[str] = 
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 def get_users_with_chats(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
-    """Fetches users and their associated chat memberships."""
+    """Fetches users and their associated chat memberships with display names."""
     users = fetch_table_data(cursor, "users")
     for user in users:
         cursor.execute("""
-            SELECT cm.*, c.title, c.type, c.username as chat_username
+            SELECT cm.*, c.title, c.type, c.username as chat_username,
+                   u.first_name as chat_fname, u.last_name as chat_lname
             FROM chat_members cm
             JOIN chats c ON cm.chat_id = c.id
+            LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
             WHERE cm.user_id = ?
         """, (user['id'],))
         cols = [d[0] for d in cursor.description]
-        user['memberships'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+        memberships = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        for m in memberships:
+            if m['type'] == 'private':
+                name = f"{m['chat_fname'] or ''} {m['chat_lname'] or ''}".strip()
+                m['display_name'] = name or f"User {m['chat_id']}"
+            else:
+                m['display_name'] = m['title'] or f"Group {m['chat_id']}"
+
+        user['memberships'] = memberships
     return users
 
 def get_chats_with_members(cursor: sqlite3.Cursor) -> List[Dict[str, Any]]:
-    """Fetches chats and their associated members."""
-    chats = fetch_table_data(cursor, "chats")
+    """Fetches chats with display names and their associated members."""
+    cursor.execute("""
+        SELECT c.*, u.first_name, u.last_name
+        FROM chats c
+        LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
+    """)
+    columns = [description[0] for description in cursor.description]
+    chats = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
     for chat in chats:
+        if chat['type'] == 'private':
+            name = f"{chat['first_name'] or ''} {chat['last_name'] or ''}".strip()
+            chat['display_name'] = name or f"User {chat['id']}"
+        else:
+            chat['display_name'] = chat['title'] or f"Group {chat['id']}"
+
         cursor.execute("""
             SELECT cm.*, u.username, u.first_name, u.last_name
             FROM chat_members cm
@@ -96,7 +120,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 membership_rows.append("<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>")
                 membership_rows.append(
                     "<tr bgcolor='#eee'>"
-                    "<th>Chat (ID)</th>"
+                    "<th>Chat</th>"
                     "<th>Status</th>"
                     "<th>Joined</th>"
                     "<th>Left</th>"
@@ -108,7 +132,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 for m in user['memberships']:
                     membership_rows.append(
                         f"<tr>"
-                        f"<td>{m['title'] or '-'} ({m['chat_id']})<br/>@{m['chat_username'] or '-'}</td>"
+                        f"<td><u>{m['display_name']}</u><br/>({m['chat_id']})<br/>@{m['chat_username'] or '-'}</td>"
                         f"<td>{m['status']}</td>"
                         f"<td>{format_timestamp(m['joined_at'])}</td>"
                         f"<td>{format_timestamp(m['left_at'])}</td>"
@@ -140,21 +164,22 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
         for chat in private_chats:
             chat_info = (
+                f"<b>Name:</b> <u>{chat['display_name'] or '-'}</u><br>"
                 f"<b>Username:</b> @{chat['username'] or '-'}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
             html_segment.append(f"<tr><td valign='top'>{chat_info}</td></tr>")
         html_segment.append("</table>")
-    
+
         # Section: Group Chats
         html_segment.append("<h2>Groups / Channels</h2>")
         html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
-    
+
         for chat in group_chats:
             chat_info = (
-                f"<b>Title:</b> <u>{chat['title'] or '-'}</u><br>"
+                f"<b>Title:</b> <u>{chat['display_name']}</u><br>"
                 f"<b>Username:</b> @{chat['username'] or '-'}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Type:</b> {chat['type']}<br>"
@@ -175,7 +200,7 @@ def generate_html(data: Dict[str, Any]) -> str:
             for m in chat['members']:
                 member_rows.append(
                     f"<tr>"
-                    f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or '-'}</td>"
+                    f"<td><u>{m['first_name']} {m['last_name'] or ''}</u><br/>({m['user_id']})<br/>@{m['username'] or '-'}</td>"
                     f"<td>{m['status']}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
                     f"<td>{format_timestamp(m['left_at'])}</td>"
@@ -186,7 +211,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 )
             member_rows.append("</table>")
             html_segment.append(f"<tr><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
-    
+
         html_segment.append("</table>")
         return "".join(html_segment)
 
