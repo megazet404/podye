@@ -18,7 +18,7 @@ def parse_date(date_str: str) -> int:
 def format_timestamp(ts: Optional[int]) -> str:
     """Converts Unix timestamp to human-readable UTC string."""
     if ts is None:
-        return "&lt;N/A&gt;"
+        return "-"
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 def parse_chat_filter(chat_arg: str) -> Union[str, List[int]]:
@@ -83,10 +83,10 @@ def generate_html(data: Dict[str, Any]) -> str:
         for user in users_data:
             user_info = (
                 f"<b>Name:</b> <u>{user['first_name']} {user['last_name'] or ''}</u><br>"
-                f"<b>Username:</b> @{user['username'] or '&lt;N/A&gt;'}<br>"
+                f"<b>Username:</b> @{user['username'] or '-'}<br>"
                 f"<b>ID:</b> {user['id']}<br>"
                 f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
-                f"<b>Lang:</b> {user['language_code'] or '&lt;N/A&gt;'}<br>"
+                f"<b>Lang:</b> {user['language_code'] or '-'}<br>"
                 f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
             )
 
@@ -108,7 +108,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 for m in user['memberships']:
                     membership_rows.append(
                         f"<tr>"
-                        f"<td>{m['title'] or '&lt;N/A&gt;'} @{m['chat_username'] or '&lt;N/A&gt;'} ({m['chat_id']})</td>"
+                        f"<td>{m['title'] or '-'} @{m['chat_username'] or '-'} ({m['chat_id']})</td>"
                         f"<td>{m['status']}</td>"
                         f"<td>{format_timestamp(m['joined_at'])}</td>"
                         f"<td>{format_timestamp(m['left_at'])}</td>"
@@ -140,7 +140,7 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
         for chat in private_chats:
             chat_info = (
-                f"<b>Username:</b> {chat['username'] or '&lt;N/A&gt;'}<br>"
+                f"<b>Username:</b> @{chat['username'] or '-'}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
@@ -154,8 +154,8 @@ def generate_html(data: Dict[str, Any]) -> str:
     
         for chat in group_chats:
             chat_info = (
-                f"<b>Title:</b> <u>{chat['title'] or '&lt;N/A&gt;'}</u><br>"
-                f"<b>Username:</b> {chat['username'] or '&lt;N/A&gt;'}<br>"
+                f"<b>Title:</b> <u>{chat['title'] or '-'}</u><br>"
+                f"<b>Username:</b> @{chat['username'] or '-'}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Type:</b> {chat['type']}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
@@ -175,7 +175,7 @@ def generate_html(data: Dict[str, Any]) -> str:
             for m in chat['members']:
                 member_rows.append(
                     f"<tr>"
-                    f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or '&lt;N/A&gt;'}</td>"
+                    f"<td>{m['first_name']} {m['last_name'] or ''} ({m['user_id']})<br>@{m['username'] or '-'}</td>"
                     f"<td>{m['status']}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
                     f"<td>{format_timestamp(m['left_at'])}</td>"
