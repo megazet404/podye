@@ -38,6 +38,7 @@ def init_db(db_path: str) -> None:
         chat_id INTEGER NOT NULL,
         sender_id INTEGER,
         reply_to_local_id INTEGER,
+        reply_to_tg_id INTEGER,
         forward_sender_id INTEGER,
         forward_message_id INTEGER,
         forward_sender_name TEXT,
@@ -137,14 +138,16 @@ def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
     cursor = conn.cursor()
     cursor.execute("""
     INSERT OR IGNORE INTO messages
-    (tg_id, chat_id, sender_id, reply_to_local_id, forward_sender_id,
-     forward_message_id, forward_sender_name, original_text, text, entities, media_group_id, date, edit_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (tg_id, chat_id, sender_id, reply_to_local_id, reply_to_tg_id,
+     forward_sender_id, forward_message_id, forward_sender_name,
+     original_text, text, entities, media_group_id, date, edit_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         message_data.get("tg_id"),
         message_data.get("chat_id"),
         message_data.get("sender_id"),
         message_data.get("reply_to_local_id"),
+        message_data.get("reply_to_tg_id"),
         message_data.get("forward_sender_id"),
         message_data.get("forward_message_id"),
         message_data.get("forward_sender_name"),
@@ -347,11 +350,15 @@ def get_messages_grouped_by_chat(conn: sqlite3.Connection, start_time: Optional[
             m.*,
             u.first_name as sender_fname, u.last_name as sender_lname, u.username as sender_uname,
             c.title as chat_title, c.type as chat_type, c.username as chat_username,
-            cu.first_name as private_chat_fname, cu.last_name as private_chat_lname
+            cu.first_name as private_chat_fname, cu.last_name as private_chat_lname,
+            rm.text as reply_text,
+            ru.first_name as reply_sender_fname, ru.last_name as reply_sender_lname
         FROM messages m
         LEFT JOIN users u ON m.sender_id = u.id
         JOIN chats c ON m.chat_id = c.id
         LEFT JOIN users cu ON c.id = cu.id AND c.type = 'private'
+        LEFT JOIN messages rm ON m.reply_to_tg_id = rm.tg_id AND m.chat_id = rm.chat_id
+        LEFT JOIN users ru ON rm.sender_id = ru.id
         {where_clause}
         ORDER BY m.chat_id, m.date ASC
     """

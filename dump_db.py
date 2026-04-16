@@ -211,16 +211,29 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
+                    reply_block = ""
+                    if m.get('reply_text') is not None or m.get('reply_sender_fname'):
+                        r_sender = f"{m['reply_sender_fname'] or ''} {m['reply_sender_lname'] or ''}".strip() or "Unknown"
+                        raw_reply_text = m.get('reply_text') if m.get('reply_text') else "[Media]"
+                        r_text = html.escape(raw_reply_text).replace("\n", "<br/>")
+
+                        reply_block = (
+                            f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #0088cc; "
+                            f"padding: 2px 0 2px 10px; margin-bottom: 8px; background: #f4f4f4;'>"
+                            f"<b>{html.escape(r_sender)}:</b><br/>{r_text}</div>"
+                        )
+                    # ...
+
                     original = ""
                     if m['original_text'] and m['original_text'] != m['text']:
                         original_text_esc = html.escape(m['original_text']).replace("\n", "<br/>")
                         original = (
                             f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; "
-                            f"padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>"
+                            f"padding-left: 5px; margin-top: 5px;'><i>Original:</i><br/>"
                             f"{original_text_esc}</div>"
                         )
 
-                    content = f"{text_content}<br/>"
+                    content = f"{reply_block}{text_content}<br/>"
                     if m['media_group_id']:
                         mg_id_esc = html.escape(m['media_group_id'])
                         content += f"<br/><small style='color: green;'>Media Group: {mg_id_esc}</small>"

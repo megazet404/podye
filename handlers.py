@@ -163,12 +163,10 @@ async def process_message(message: types.Message) -> None:
             upsert_chat(conn, extract_chat_data(message.sender_chat), timestamp)
 
         reply_to_local_id = None
+        reply_to_tg_id = None
         if message.reply_to_message:
-            reply_to_local_id = get_local_message_id(
-                conn,
-                message.reply_to_message.message_id,
-                chat_id
-            )
+            reply_to_tg_id = message.reply_to_message.message_id
+            reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
 
         forward_sender_id, forward_message_id, forward_sender_name = \
             extract_forward_sender_info(message)
@@ -188,10 +186,11 @@ async def process_message(message: types.Message) -> None:
             "chat_id": chat_id,
             "sender_id": sender_id,
             "reply_to_local_id": reply_to_local_id,
+            "reply_to_tg_id": reply_to_tg_id,
             "forward_sender_id": forward_sender_id,
             "forward_message_id": forward_message_id,
             "forward_sender_name": forward_sender_name,
-            "text": message.text,
+            "text": message.text or message.caption,
             "entities": entities_json,
             "media_group_id": message.media_group_id,
             "date": int(message.date.timestamp()),
@@ -223,10 +222,10 @@ async def process_edited_message(message: types.Message) -> None:
     logger.debug(f"Processing edited message {message.message_id} from chat {message.chat.id}")
 
     current_text = message.text or message.caption
-    
+
     entities_list = message.entities or message.caption_entities
     entities_json = (
-        json.dumps([e.model_dump() for e in entities_list]) 
+        json.dumps([e.model_dump() for e in entities_list])
         if entities_list else None
     )
 
