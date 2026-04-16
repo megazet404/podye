@@ -140,7 +140,7 @@ def extract_forward_sender_info(message: types.Message) -> tuple:
 
     return forward_sender_id, forward_message_id, forward_sender_name
 
-async def save_message_to_db(conn, message: types.Message, timestamp: int,
+def save_message_to_db(conn, message: types.Message, timestamp: int,
                              update_activity: bool = True) -> Optional[int]:
     """Helper to extract data and upsert message with its media and sender info."""
     chat_id = message.chat.id
@@ -164,7 +164,7 @@ async def save_message_to_db(conn, message: types.Message, timestamp: int,
     if message.reply_to_message:
         # Recursive call to save the replied-to message first
         # We don't update activity for the old message's sender here
-        await save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
+        save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
 
         reply_to_tg_id = message.reply_to_message.message_id
         reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
@@ -218,7 +218,7 @@ async def process_message(message: types.Message) -> None:
     conn = get_db_connection(DB_PATH)
 
     try:
-        await save_message_to_db(conn, message, timestamp)
+        save_message_to_db(conn, message, timestamp)
 
         # Handle service messages (members join/leave)
         if message.new_chat_members:
@@ -237,7 +237,7 @@ async def process_edited_message(message: types.Message) -> None:
     try:
         # Using save_message_to_db ensures that an edited message
         # is either updated or created if it was missing.
-        await save_message_to_db(conn, message, timestamp, update_activity=False)
+        save_message_to_db(conn, message, timestamp, update_activity=False)
     finally:
         conn.close()
 
