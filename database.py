@@ -166,12 +166,56 @@ def insert_message(conn: sqlite3.Connection, message_data: dict) -> int:
         logger.debug(f"Message IGNORED (duplicate): tg_id={message_data.get('tg_id')}")
     return row_id
 
+def upsert_message(conn: sqlite3.Connection, message_data: dict) -> int:
+    """Inserts a new message or updates an existing one if the new data is more recent."""
+    cursor = conn.cursor()
+    # original_text is set only once during initial INSERT.
+    # text, entities, and edit_date are updated only if the incoming edit_date
+    # is greater than or equal to the existing one.
+    cursor.execute("""
+    INSERT INTO messages
+    (tg_id, chat_id, sender_id, reply_to_local_id, reply_to_tg_id,
+     forward_sender_id, forward_message_id, forward_sender_name,
+     original_text, text, entities, media_group_id, date, edit_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (tg_id, chat_id) DO UPDATE SET
+        text = CASE
+            WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
+            THEN excluded.text ELSE messages.text END,
+        entities = CASE
+            WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
+            THEN excluded.entities ELSE messages.entities END,
+        edit_date = CASE
+            WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
+            THEN excluded.edit_date ELSE messages.edit_date END
+    """, (
+        message_data.get("tg_id"),
+        message_data.get("chat_id"),
+        message_data.get("sender_id"),
+        message_data.get("reply_to_local_id"),
+        message_data.get("reply_to_tg_id"),
+        message_data.get("forward_sender_id"),
+        message_data.get("forward_message_id"),
+        message_data.get("forward_sender_name"),
+        message_data.get("text"), # used as original_text on insert
+        message_data.get("text"),
+        message_data.get("entities"),
+        message_data.get("media_group_id"),
+        message_data.get("date"),
+        message_data.get("edit_date")
+    ))
+    conn.commit()
+
+    cursor.execute("SELECT id FROM messages WHERE tg_id = ? AND chat_id = ?",
+                   (message_data.get("tg_id"), message_data.get("chat_id")))
+    return cursor.fetchone()[0]
+
 def insert_media(conn: sqlite3.Connection, message_id: int, media_list: List[dict]) -> None:
     cursor = conn.cursor()
     count = 0
     for media in media_list:
         cursor.execute("""
-        INSERT INTO message_media
+        INSERT OR IGNORE INTO message_media
         (message_id, file_id, file_unique_id, file_type, file_size, mime_type, file_path, width, height)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (

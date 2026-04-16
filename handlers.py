@@ -7,7 +7,7 @@ from aiogram.types import ChatMemberUpdated
 from database import (
     get_db_connection, upsert_user, upsert_chat, insert_message,
     insert_media, update_chat_member_activity, update_chat_member_status,
-    get_local_message_id, update_message_text  # Добавлена функция
+    get_local_message_id, update_message_text, upsert_message
 )
 
 from config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
@@ -140,6 +140,77 @@ def extract_forward_sender_info(message: types.Message) -> tuple:
 
     return forward_sender_id, forward_message_id, forward_sender_name
 
+async def save_message_to_db(conn, message: types.Message, timestamp: int,
+                             update_activity: bool = True) -> Optional[int]:
+    """Helper to extract data and upsert message with its media and sender info."""
+    chat_id = message.chat.id
+
+    upsert_chat(conn, extract_chat_data(message.chat), timestamp)
+
+    sender_id = None
+    if message.from_user:
+        sender_id = message.from_user.id
+        if sender_id > 0:
+            upsert_user(conn, extract_user_data(message.from_user), timestamp)
+            if update_activity:
+                update_chat_member_activity(conn, chat_id, sender_id, timestamp)
+
+    if message.sender_chat:
+        sender_id = message.sender_chat.id
+        upsert_chat(conn, extract_chat_data(message.sender_chat), timestamp)
+
+    reply_to_local_id = None
+    reply_to_tg_id = None
+    if message.reply_to_message:
+        # Recursive call to save the replied-to message first
+        # We don't update activity for the old message's sender here
+        await save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
+
+        reply_to_tg_id = message.reply_to_message.message_id
+        reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
+
+    forward_sender_id, forward_message_id, forward_sender_name = extract_forward_sender_info(message)
+    # Forwarding logic remains the same...
+    if forward_sender_id and forward_sender_id > 0:
+        if message.forward_origin and message.forward_origin.type == "user":
+            upsert_user(conn, extract_user_data(message.forward_origin.sender_user), timestamp)
+
+    entities_list = message.entities or message.caption_entities
+    entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
+
+    # Safe timestamp extraction
+    date_val = message.date
+    date_ts = int(date_val.timestamp()) if hasattr(date_val, 'timestamp') else int(date_val)
+
+    edit_date_ts = None
+    if message.edit_date:
+        edit_val = message.edit_date
+        edit_date_ts = int(edit_val.timestamp()) if hasattr(edit_val, 'timestamp') else int(edit_val)
+
+    message_data = {
+        "tg_id": message.message_id,
+        "chat_id": chat_id,
+        "sender_id": sender_id,
+        "reply_to_local_id": reply_to_local_id,
+        "reply_to_tg_id": reply_to_tg_id,
+        "forward_sender_id": forward_sender_id,
+        "forward_message_id": forward_message_id,
+        "forward_sender_name": forward_sender_name,
+        "text": message.text or message.caption,
+        "entities": entities_json,
+        "media_group_id": message.media_group_id,
+        "date": date_ts,
+        "edit_date": edit_date_ts
+    }
+
+    local_id = upsert_message(conn, message_data)
+
+    media_list = extract_media_data(message)
+    if media_list:
+        insert_media(conn, local_id, media_list)
+
+    return local_id
+
 async def process_message(message: types.Message) -> None:
     timestamp = int(time.time())
     logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
@@ -147,99 +218,26 @@ async def process_message(message: types.Message) -> None:
     conn = get_db_connection(DB_PATH)
 
     try:
-        chat_id = message.chat.id
+        await save_message_to_db(conn, message, timestamp)
 
-        upsert_chat(conn, extract_chat_data(message.chat), timestamp)
-
-        sender_id = None
-        if message.from_user:
-            sender_id = message.from_user.id
-            if message.from_user.id > 0:
-                upsert_user(conn, extract_user_data(message.from_user), timestamp)
-                update_chat_member_activity(conn, chat_id, message.from_user.id, timestamp)
-
-        if message.sender_chat:
-            sender_id = message.sender_chat.id
-            upsert_chat(conn, extract_chat_data(message.sender_chat), timestamp)
-
-        reply_to_local_id = None
-        reply_to_tg_id = None
-        if message.reply_to_message:
-            reply_to_tg_id = message.reply_to_message.message_id
-            reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
-
-        forward_sender_id, forward_message_id, forward_sender_name = \
-            extract_forward_sender_info(message)
-
-        if forward_sender_id and forward_sender_id > 0:
-            if message.forward_origin and message.forward_origin.type == "user":
-                upsert_user(conn, extract_user_data(message.forward_origin.sender_user), timestamp)
-        elif forward_sender_id and forward_sender_id < 0:
-            if message.forward_origin and message.forward_origin.type in ["chat", "channel"]:
-                chat_info = message.forward_origin.sender_chat if hasattr(message.forward_origin, 'sender_chat') else message.forward_origin.chat
-                upsert_chat(conn, extract_chat_data(chat_info), timestamp)
-
-        entities_json = json.dumps([e.model_dump() for e in message.entities]) if message.entities else None
-
-        message_data = {
-            "tg_id": message.message_id,
-            "chat_id": chat_id,
-            "sender_id": sender_id,
-            "reply_to_local_id": reply_to_local_id,
-            "reply_to_tg_id": reply_to_tg_id,
-            "forward_sender_id": forward_sender_id,
-            "forward_message_id": forward_message_id,
-            "forward_sender_name": forward_sender_name,
-            "text": message.text or message.caption,
-            "entities": entities_json,
-            "media_group_id": message.media_group_id,
-            "date": int(message.date.timestamp()),
-            "edit_date": int(message.edit_date.timestamp()) if message.edit_date else None
-        }
-
-        local_message_id = insert_message(conn, message_data)
-
-        media_list = extract_media_data(message)
-        if media_list and local_message_id:
-            insert_media(conn, local_message_id, media_list)
-
+        # Handle service messages (members join/leave)
         if message.new_chat_members:
             for member in message.new_chat_members:
                 upsert_user(conn, extract_user_data(member), timestamp)
-                update_chat_member_status(conn, chat_id, member.id, "member", timestamp)
-                update_chat_member_activity(conn, chat_id, member.id, timestamp)
+                update_chat_member_status(conn, message.chat.id, member.id, "member", timestamp)
 
         if message.left_chat_member:
-            update_chat_member_status(
-                conn, chat_id, message.left_chat_member.id,
-                "left", timestamp, is_left=True
-            )
-
+            update_chat_member_status(conn, message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
     finally:
         conn.close()
 
 async def process_edited_message(message: types.Message) -> None:
-    logger.debug(f"Processing edited message {message.message_id} from chat {message.chat.id}")
-
-    current_text = message.text or message.caption
-
-    entities_list = message.entities or message.caption_entities
-    entities_json = (
-        json.dumps([e.model_dump() for e in entities_list])
-        if entities_list else None
-    )
-
-    message_data = {
-        "tg_id": message.message_id,
-        "chat_id": message.chat.id,
-        "text": current_text,
-        "edit_date": message.edit_date,
-        "entities": entities_json
-    }
-
+    timestamp = int(time.time())
     conn = get_db_connection(DB_PATH)
     try:
-        update_message_text(conn, message_data)
+        # Using save_message_to_db ensures that an edited message
+        # is either updated or created if it was missing.
+        await save_message_to_db(conn, message, timestamp, update_activity=False)
     finally:
         conn.close()
 
