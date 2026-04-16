@@ -211,7 +211,7 @@ def save_message_to_db(conn, message: types.Message, timestamp: int,
 
     return local_id
 
-async def process_message(message: types.Message) -> None:
+def process_message(message: types.Message) -> None:
     timestamp = int(time.time())
     logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
 
@@ -231,7 +231,7 @@ async def process_message(message: types.Message) -> None:
     finally:
         conn.close()
 
-async def process_edited_message(message: types.Message) -> None:
+def process_edited_message(message: types.Message) -> None:
     timestamp = int(time.time())
     conn = get_db_connection(DB_PATH)
     try:
@@ -241,7 +241,7 @@ async def process_edited_message(message: types.Message) -> None:
     finally:
         conn.close()
 
-async def process_chat_member_update(event: ChatMemberUpdated) -> None:
+def process_chat_member_update(event: ChatMemberUpdated) -> None:
     timestamp = int(time.time())
     conn = get_db_connection(DB_PATH)
 

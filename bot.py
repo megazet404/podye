@@ -38,7 +38,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
                 logger.error(f"Failed to leave chat {message.chat.id}: {e}")
         return
 
-    await process_message(message)
+    process_message(message)
 
 @dp.edited_message()
 async def handle_edited_message(message: Message) -> None:
@@ -48,13 +48,13 @@ async def handle_edited_message(message: Message) -> None:
     if not is_allowed_chat(message.chat.id):
         return
 
-    await process_edited_message(message)
+    process_edited_message(message)
 
 @dp.chat_member()
 async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
     logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
-    await process_chat_member_update(event)
+    process_chat_member_update(event)
 
 @dp.my_chat_member()
 async def handle_my_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
