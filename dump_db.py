@@ -1,3 +1,4 @@
+import html
 import json
 import argparse
 from datetime import datetime, timezone
@@ -186,18 +187,25 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                 for m in cinfo["msgs"]:
                     sender_name = f"{m['sender_fname'] or ''} {m['sender_lname'] or ''}".strip() or "Unknown"
-                    sender = f"<u>{sender_name}</u><br/>({m['sender_id']})<br/>@{m['sender_uname'] or '-'}"
+                    sender = f"<u>{html.escape(sender_name)}</u><br/>({m['sender_id']})<br/>@{m['sender_uname'] or '-'}"
+
+                    text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
                     original = ""
                     if m['original_text'] and m['original_text'] != m['text']:
-                        original = f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>{m['original_text']}</div>"
+                        original_text_esc = html.escape(m['original_text']).replace("\n", "<br/>")
+                        original = (
+                            f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; "
+                            f"padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>"
+                            f"{original_text_esc}</div>"
+                        )
 
-                    content = f"{m['text'] or ''}<br/>"
+                    content = f"{text_content}<br/>"
                     if m['media_group_id']:
                         content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
                     if m['edit_date']:
                         content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
-               
+
                     content += original
 
                     html_segment.append(
@@ -217,30 +225,30 @@ def generate_html(data: Dict[str, Any]) -> str:
         if private_chats:
             html_segment.append("<h2>Private chats</h2>")
             html_segment.append(render_chats_list(private_chats))
-        
+
         if group_chats:
             html_segment.append("<h2>Groups / Channels</h2>")
             html_segment.append(render_chats_list(group_chats))
 
         return "".join(html_segment)
 
-    html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
+    html_lines = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
 
-    html.append("<h1>Summary Information</h1>")
-    html.append(f"<p>Generated at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC</p>")
+    html_lines.append("<h1>Summary Information</h1>")
+    html_lines.append(f"<p>Generated at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC</p>")
 
-    html.append("<h1>Users</h1>")
-    html.append(generate_users(data.get("users_full", [])))
+    html_lines.append("<h1>Users</h1>")
+    html_lines.append(generate_users(data.get("users_full", [])))
 
-    html.append("<h1>Chats</h1>")
-    html.append(generate_chats(data.get("chats_full", [])))
+    html_lines.append("<h1>Chats</h1>")
+    html_lines.append(generate_chats(data.get("chats_full", [])))
 
     if "messages_full" in data:
-        html.append("<h1>Messages</h1>")
-        html.append(generate_messages(data["messages_full"]))
+        html_lines.append("<h1>Messages</h1>")
+        html_lines.append(generate_messages(data["messages_full"]))
 
-    html.append("</body></html>")
-    return "\n".join(html)
+    html_lines.append("</body></html>")
+    return "\n".join(html_lines)
 
 def dump_database(db_path: str, output_path: str, start_time: Optional[int],
                   end_time: Optional[int], chat_filter: Union[str, List[int]],
