@@ -174,7 +174,7 @@ def generate_html(data: Dict[str, Any]) -> str:
 
         html_segment = []
         for cid, chat_info in chats.items():
-            html_segment.append(f"<h3>Chat: {chat_info['name']} ({cid})</h3>")
+            html_segment.append(f"<h2>Chat: {chat_info['name']} ({cid})</h2>")
             html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
             html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
 
@@ -186,11 +186,13 @@ def generate_html(data: Dict[str, Any]) -> str:
                 if m['original_text'] and m['original_text'] != m['text']:
                     original = f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>{m['original_text']}</div>"
 
-                content = f"{original} {m['text']}"
-                if m['edit_date']:
-                    content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
+                content = f"{m['text']}<br/>"
                 if m['media_group_id']:
                     content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
+                if m['edit_date']:
+                    content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
+               
+                content += original
 
                 html_segment.append(
                     f"<tr>"
