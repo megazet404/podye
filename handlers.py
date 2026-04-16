@@ -194,8 +194,8 @@ async def process_message(message: types.Message) -> None:
             "text": message.text,
             "entities": entities_json,
             "media_group_id": message.media_group_id,
-            "date": message.date,
-            "edit_date": message.edit_date
+            "date": int(message.date.timestamp()),
+            "edit_date": int(message.edit_date.timestamp()) if message.edit_date else None
         }
 
         local_message_id = insert_message(conn, message_data)
