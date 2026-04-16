@@ -129,11 +129,13 @@ def generate_html(data: Dict[str, Any]) -> str:
         for chat in group_chats:
             d_name = html.escape(chat['display_name'] or "")
             username = html.escape(chat['username'] or "-")
+            description = html.escape(chat['description'] or "-")
             chat_info = (
                 f"<b>Title:</b> <u>{d_name}</u><br>"
                 f"<b>Username:</b> @{username}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Type:</b> {html.escape(chat['type'] or '')}<br>"
+                f"<b>Description:</b> {description}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
             member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
