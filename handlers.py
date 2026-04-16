@@ -219,10 +219,6 @@ async def process_message(message: types.Message) -> None:
     finally:
         conn.close()
 
-# handlers.py
-
-# handlers.py
-
 async def process_edited_message(message: types.Message) -> None:
     logger.debug(f"Processing edited message {message.message_id} from chat {message.chat.id}")
 
