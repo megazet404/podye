@@ -346,7 +346,7 @@ def get_messages_grouped_by_chat(conn: sqlite3.Connection, start_time: Optional[
         SELECT
             m.*,
             u.first_name as sender_fname, u.last_name as sender_lname, u.username as sender_uname,
-            c.title as chat_title, c.type as chat_type,
+            c.title as chat_title, c.type as chat_type, c.username as chat_username,
             cu.first_name as private_chat_fname, cu.last_name as private_chat_lname
         FROM messages m
         LEFT JOIN users u ON m.sender_id = u.id

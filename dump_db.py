@@ -169,39 +169,59 @@ def generate_html(data: Dict[str, Any]) -> str:
                 else:
                     display_name = m['chat_title'] or "-"
 
-                chats[cid] = {"name": display_name, "msgs": []}
+                chats[cid] = {
+                    "name": display_name,
+                    "username": m.get('chat_username'),
+                    "type": m['chat_type'],
+                    "msgs": []
+                }
             chats[cid]["msgs"].append(m)
 
-        html_segment = []
-        for cid, chat_info in chats.items():
-            html_segment.append(f"<h2>Chat: {chat_info['name']} ({cid})</h2>")
-            html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
-            html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
+        def render_chats_list(category_chats):
+            html_segment = []
+            for cid, cinfo in category_chats.items():
+                html_segment.append(f"<h3>{cinfo['name']} ({cid}) @{cinfo['username'] or '-'}</h3>")
+                html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+                html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
 
-            for m in chat_info["msgs"]:
-                sender = f"<u>{m['sender_fname'] or ''} {m['sender_lname'] or ''}</u><br/>({m['sender_id']})<br/>@{m['sender_uname']}"
+                for m in cinfo["msgs"]:
+                    sender_name = f"{m['sender_fname'] or ''} {m['sender_lname'] or ''}".strip() or "Unknown"
+                    sender = f"<u>{sender_name}</u><br/>({m['sender_id']})<br/>@{m['sender_uname'] or '-'}"
 
-                # Logic for original_text
-                original = ""
-                if m['original_text'] and m['original_text'] != m['text']:
-                    original = f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>{m['original_text']}</div>"
+                    original = ""
+                    if m['original_text'] and m['original_text'] != m['text']:
+                        original = f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>{m['original_text']}</div>"
 
-                content = f"{m['text']}<br/>"
-                if m['media_group_id']:
-                    content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
-                if m['edit_date']:
-                    content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
+                    content = f"{m['text'] or ''}<br/>"
+                    if m['media_group_id']:
+                        content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
+                    if m['edit_date']:
+                        content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
                
-                content += original
+                    content += original
 
-                html_segment.append(
-                    f"<tr>"
-                    f"<td valign='top'>{format_timestamp(m['date'])}</td>"
-                    f"<td valign='top'>{sender}</td>"
-                    f"<td valign='top'>{content}</td>"
-                    f"</tr>"
-                )
-            html_segment.append("</table><br/>")
+                    html_segment.append(
+                        f"<tr>"
+                        f"<td valign='top'>{format_timestamp(m['date'])}</td>"
+                        f"<td valign='top'>{sender}</td>"
+                        f"<td valign='top'>{content}</td>"
+                        f"</tr>"
+                    )
+                html_segment.append("</table><br/>")
+            return "".join(html_segment)
+
+        private_chats = {cid: info for cid, info in chats.items() if info['type'] == 'private'}
+        group_chats = {cid: info for cid, info in chats.items() if info['type'] != 'private'}
+
+        html_segment = []
+        if private_chats:
+            html_segment.append("<h2>Private chats</h2>")
+            html_segment.append(render_chats_list(private_chats))
+        
+        if group_chats:
+            html_segment.append("<h2>Groups / Channels</h2>")
+            html_segment.append(render_chats_list(group_chats))
+
         return "".join(html_segment)
 
     html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
