@@ -45,12 +45,17 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("<tr bgcolor='#ddd'><th>User Info</th><th>Chat Memberships</th></tr>")
 
         for user in users_data:
+            first_name = html.escape(user['first_name'] or "")
+            last_name = html.escape(user['last_name'] or "")
+            username = html.escape(user['username'] or "-")
+            lang = html.escape(user['language_code'] or "-")
+
             user_info = (
-                f"<b>Name:</b> <u>{user['first_name']} {user['last_name'] or ''}</u><br>"
-                f"<b>Username:</b> @{user['username'] or '-'}<br>"
+                f"<b>Name:</b> <u>{first_name} {last_name}</u><br>"
+                f"<b>Username:</b> @{username}<br>"
                 f"<b>ID:</b> {user['id']}<br>"
                 f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
-                f"<b>Lang:</b> {user['language_code'] or '-'}<br>"
+                f"<b>Lang:</b> {lang}<br>"
                 f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
             )
 
@@ -70,10 +75,12 @@ def generate_html(data: Dict[str, Any]) -> str:
                     "</tr>"
                 )
                 for m in user['memberships']:
+                    d_name = html.escape(m['display_name'] or "")
+                    c_username = html.escape(m['chat_username'] or "-")
                     membership_rows.append(
                         f"<tr>"
-                        f"<td><u>{m['display_name']}</u><br/>({m['chat_id']})<br/>@{m['chat_username'] or '-'}</td>"
-                        f"<td>{m['status']}</td>"
+                        f"<td><u>{d_name}</u><br/>({m['chat_id']})<br/>@{c_username}</td>"
+                        f"<td>{html.escape(m['status'])}</td>"
                         f"<td>{format_timestamp(m['joined_at'])}</td>"
                         f"<td>{format_timestamp(m['left_at'])}</td>"
                         f"<td>{format_timestamp(m['first_activity'])}</td>"
@@ -103,9 +110,11 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
         for chat in private_chats:
+            d_name = html.escape(chat['display_name'] or "-")
+            username = html.escape(chat['username'] or "-")
             chat_info = (
-                f"<b>Name:</b> <u>{chat['display_name'] or '-'}</u><br>"
-                f"<b>Username:</b> @{chat['username'] or '-'}<br>"
+                f"<b>Name:</b> <u>{d_name}</u><br>"
+                f"<b>Username:</b> @{username}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
@@ -118,11 +127,13 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
 
         for chat in group_chats:
+            d_name = html.escape(chat['display_name'] or "")
+            username = html.escape(chat['username'] or "-")
             chat_info = (
-                f"<b>Title:</b> <u>{chat['display_name']}</u><br>"
-                f"<b>Username:</b> @{chat['username'] or '-'}<br>"
+                f"<b>Title:</b> <u>{d_name}</u><br>"
+                f"<b>Username:</b> @{username}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
-                f"<b>Type:</b> {chat['type']}<br>"
+                f"<b>Type:</b> {html.escape(chat['type'] or '')}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
             member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
@@ -137,11 +148,14 @@ def generate_html(data: Dict[str, Any]) -> str:
                 "<th>Updated</th>"
                 "</tr>"
             )
-            for m in chat['members']:
+            for m in chat.get('members', []):
+                m_fname = html.escape(m['first_name'] or "")
+                m_lname = html.escape(m['last_name'] or "")
+                m_uname = html.escape(m['username'] or "-")
                 member_rows.append(
                     f"<tr>"
-                    f"<td><u>{m['first_name']} {m['last_name'] or ''}</u><br/>({m['user_id']})<br/>@{m['username'] or '-'}</td>"
-                    f"<td>{m['status']}</td>"
+                    f"<td><u>{m_fname} {m_lname}</u><br/>({m['user_id']})<br/>@{m_uname}</td>"
+                    f"<td>{html.escape(m['status'] or '')}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
                     f"<td>{format_timestamp(m['left_at'])}</td>"
                     f"<td>{format_timestamp(m['first_activity'])}</td>"
@@ -181,13 +195,17 @@ def generate_html(data: Dict[str, Any]) -> str:
         def render_chats_list(category_chats):
             html_segment = []
             for cid, cinfo in category_chats.items():
-                html_segment.append(f"<h3>{cinfo['name']} ({cid}) @{cinfo['username'] or '-'}</h3>")
+                c_name_esc = html.escape(cinfo['name'])
+                c_uname_esc = html.escape(cinfo['username'] or "-")
+
+                html_segment.append(f"<h3>{c_name_esc} ({cid}) @{c_uname_esc}</h3>")
                 html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
                 html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
 
                 for m in cinfo["msgs"]:
                     sender_name = f"{m['sender_fname'] or ''} {m['sender_lname'] or ''}".strip() or "Unknown"
-                    sender = f"<u>{html.escape(sender_name)}</u><br/>({m['sender_id']})<br/>@{m['sender_uname'] or '-'}"
+                    s_uname_esc = html.escape(m['sender_uname'] or "-")
+                    sender = f"<u>{html.escape(sender_name)}</u><br/>({m['sender_id']})<br/>@{s_uname_esc}"
 
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
@@ -202,7 +220,8 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                     content = f"{text_content}<br/>"
                     if m['media_group_id']:
-                        content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
+                        mg_id_esc = html.escape(m['media_group_id'])
+                        content += f"<br/><small style='color: green;'>Media Group: {mg_id_esc}</small>"
                     if m['edit_date']:
                         content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
 
