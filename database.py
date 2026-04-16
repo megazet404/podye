@@ -322,3 +322,41 @@ def get_chats_with_members(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
         cols = [d[0] for d in cursor.description]
         chat['members'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
     return chats
+
+def get_messages_grouped_by_chat(conn: sqlite3.Connection, start_time: Optional[int],
+                                 end_time: Optional[int], chat_filter: Union[str, List[int]]) -> List[Dict[str, Any]]:
+    """Fetches messages with sender and chat metadata for HTML dump."""
+    conditions = []
+    params = []
+
+    if start_time is not None:
+        conditions.append("m.date >= ?")
+        params.append(start_time)
+    if end_time is not None:
+        conditions.append("m.date <= ?")
+        params.append(end_time)
+    if isinstance(chat_filter, list):
+        placeholders = ",".join("?" * len(chat_filter))
+        conditions.append(f"m.chat_id IN ({placeholders})")
+        params.extend(chat_filter)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    query = f"""
+        SELECT
+            m.*,
+            u.first_name as sender_fname, u.last_name as sender_lname, u.username as sender_uname,
+            c.title as chat_title, c.type as chat_type,
+            cu.first_name as private_chat_fname, cu.last_name as private_chat_lname
+        FROM messages m
+        LEFT JOIN users u ON m.sender_id = u.id
+        JOIN chats c ON m.chat_id = c.id
+        LEFT JOIN users cu ON c.id = cu.id AND c.type = 'private'
+        {where_clause}
+        ORDER BY m.chat_id, m.date ASC
+    """
+
+    cursor = conn.cursor()
+    cursor.execute(query, tuple(params))
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, row)) for row in cursor.fetchall()]

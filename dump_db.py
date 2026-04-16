@@ -35,7 +35,7 @@ def parse_chat_filter(chat_arg: str) -> Union[str, List[int]]:
         raise ValueError(f"Invalid chat ID format: {chat_arg}")
 
 def generate_html(data: Dict[str, Any]) -> str:
-    """Generates simple HTML for debugging."""
+    """Generates structured HTML for debugging and audit."""
 
     def generate_users(users_data: List[Dict[str, Any]]) -> str:
         """Sub-function to generate the Users section."""
@@ -154,13 +154,68 @@ def generate_html(data: Dict[str, Any]) -> str:
         html_segment.append("</table>")
         return "".join(html_segment)
 
+    def generate_messages(messages_data: List[Dict[str, Any]]) -> str:
+        if not messages_data:
+            return "<p>No messages found for the given criteria.</p>"
+
+        # Grouping by chat
+        chats = {}
+        for m in messages_data:
+            cid = m['chat_id']
+            if cid not in chats:
+                if m['chat_type'] == 'private':
+                    name = f"{m['private_chat_fname'] or ''} {m['private_chat_lname'] or ''}".strip()
+                    display_name = name or "-"
+                else:
+                    display_name = m['chat_title'] or "-"
+
+                chats[cid] = {"name": display_name, "msgs": []}
+            chats[cid]["msgs"].append(m)
+
+        html_segment = []
+        for cid, chat_info in chats.items():
+            html_segment.append(f"<h3>Chat: {chat_info['name']} ({cid})</h3>")
+            html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+            html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
+
+            for m in chat_info["msgs"]:
+                sender = f"<u>{m['sender_fname'] or ''} {m['sender_lname'] or ''}</u><br/>({m['sender_id']})<br/>@{m['sender_uname']}"
+
+                # Logic for original_text
+                original = ""
+                if m['original_text'] and m['original_text'] != m['text']:
+                    original = f"<div style='color: #777; font-size: 0.9em; border-left: 2px solid #ccc; padding-left: 5px; margin-bottom: 5px;'><i>Original:</i><br/>{m['original_text']}</div>"
+
+                content = f"{original} {m['text']}"
+                if m['edit_date']:
+                    content += f"<br/><small style='color: blue;'>Edited at: {format_timestamp(m['edit_date'])}</small>"
+                if m['media_group_id']:
+                    content += f"<br/><small style='color: green;'>Media Group: {m['media_group_id']}</small>"
+
+                html_segment.append(
+                    f"<tr>"
+                    f"<td valign='top'>{format_timestamp(m['date'])}</td>"
+                    f"<td valign='top'>{sender}</td>"
+                    f"<td valign='top'>{content}</td>"
+                    f"</tr>"
+                )
+            html_segment.append("</table><br/>")
+        return "".join(html_segment)
+
     html = ["<html><head><meta charset='utf-8'><title>Database Dump</title></head><body>"]
+
+    html.append("<h1>Summary Information</h1>")
+    html.append(f"<p>Generated at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC</p>")
 
     html.append("<h1>Users</h1>")
     html.append(generate_users(data.get("users_full", [])))
 
     html.append("<h1>Chats</h1>")
     html.append(generate_chats(data.get("chats_full", [])))
+
+    if "messages_full" in data:
+        html.append("<h1>Messages</h1>")
+        html.append(generate_messages(data["messages_full"]))
 
     html.append("</body></html>")
     return "\n".join(html)
@@ -174,6 +229,9 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
     if fmt == 'html':
         data["users_full"] = get_users_with_chats(conn)
         data["chats_full"] = get_chats_with_members(conn)
+        if chat_filter != 'none':
+            from database import get_messages_grouped_by_chat
+            data["messages_full"] = get_messages_grouped_by_chat(conn, start_time, end_time, chat_filter)
     else:
         data["users"] = fetch_table_data(conn, "users")
         data["chats"] = fetch_table_data(conn, "chats")
