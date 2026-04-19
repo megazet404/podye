@@ -59,7 +59,6 @@ class DatabaseRepository:
             );
 
             CREATE TABLE IF NOT EXISTS message_media (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message_id INTEGER NOT NULL,
                 chat_id INTEGER NOT NULL,
                 file_id TEXT NOT NULL,
@@ -70,6 +69,7 @@ class DatabaseRepository:
                 file_path TEXT,
                 width INTEGER,
                 height INTEGER,
+                PRIMARY KEY (message_id, chat_id, file_unique_id),
                 FOREIGN KEY (message_id, chat_id) REFERENCES messages (message_id, chat_id)
             );
 
