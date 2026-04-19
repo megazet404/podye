@@ -118,7 +118,8 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<b>Name:</b> <u>{d_name}</u><br>"
                 f"<b>Username:</b> @{username}<br>"
                 f"<b>ID:</b> {chat['id']}<br>"
-                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br>"
+                f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
             )
             html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
         html_segment.append("</table>")
@@ -138,7 +139,8 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Type:</b> {html.escape(chat['type'] or '')}<br>"
                 f"<b>Description:</b> {description}<br>"
-                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br>"
+                f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
             )
             member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
             member_rows.append(
@@ -168,7 +170,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                     f"</tr>"
                 )
             member_rows.append("</table>")
-            html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
+            html_segment.append(f"<tr><td valign='top' width='25%' id='chat_{chat['id']}'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
 
         html_segment.append("</table>")
         return "".join(html_segment)
@@ -202,13 +204,12 @@ def generate_html(data: Dict[str, Any]) -> str:
                 c_name_esc = html.escape(cinfo['name'])
                 c_uname_esc = html.escape(cinfo['username'] or "-")
 
-                # Заголовок обёрнут в ссылку на раздел Chats
                 html_segment.append(
-                    f"<h3>"
+                    f"<h3 id='chat_msgs_{cid}'>"
                     f"<a href='#chat_{cid}' style='text-decoration: none; color: inherit;'>"
                     f"<u>{c_name_esc}</u>"
                     f"</a>"
-                    f"({cid}) @{c_uname_esc}"
+                    f" ({cid}) @{c_uname_esc}"
                     f"</h3>"
                 )
                 html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
