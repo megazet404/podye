@@ -267,6 +267,34 @@ def generate_html(data: Dict[str, Any]) -> str:
                             f"</a>"
                         )
 
+                    forward_block = ""
+                    if m.get('forward_sender_id') is not None or m.get('forward_sender_name') is not None:
+                        f_id = m.get('forward_sender_id')
+                        f_name_raw = m.get('forward_sender_name')
+
+                        f_link = None
+                        if f_id:
+                            if f_id > 0: # User
+                                u_fname = m.get('fwd_user_fname') or ""
+                                u_lname = m.get('fwd_user_lname') or ""
+                                f_display_name = f"{u_fname} {u_lname}".strip() or f"User {f_id}"
+                                f_link = f"#user_{f_id}"
+                            else: # Chat/Channel
+                                f_display_name = m.get('fwd_chat_title') or f"Chat {f_id}"
+                                f_link = f"#chat_{f_id}"
+                        else:
+                            f_display_name = f_name_raw or "Unknown Original Sender"
+
+                        f_name_html = html.escape(f_display_name)
+                        if f_link:
+                            f_name_html = f"<a href='{f_link}' style='text-decoration: none; color: inherit;'><u>{f_name_html}</u></a>"
+
+                        forward_block = (
+                            f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #52a152; "
+                            f"padding: 2px 0 2px 10px; margin-bottom: 8px; background: #f4f4f4;'>"
+                            f"<b>Forwarded from {f_name_html}</b></div>"
+                        )
+
                     original = ""
                     if m['original_text'] and m['original_text'] != m['text']:
                         original_text_esc = html.escape(m['original_text']).replace("\n", "<br/>")
@@ -276,7 +304,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                             f"{original_text_esc}</div>"
                         )
 
-                    content = f"{reply_block}{text_content}<br/>"
+                    content = f"{reply_block}{forward_block}{text_content}<br/>"
                     if m['media_group_id']:
                         mg_id_esc = html.escape(m['media_group_id'])
                         content += f"<br/><small style='color: green;'>Media Group: {mg_id_esc}</small>"

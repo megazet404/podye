@@ -323,13 +323,17 @@ class DatabaseRepository:
                 u.first_name as sender_fname, u.last_name as sender_lname, u.username as sender_uname,
                 c.title as chat_title, c.type as chat_type, c.username as chat_username,
                 cu.first_name as private_chat_fname, cu.last_name as private_chat_lname,
-                rm.text as reply_text, ru.first_name as reply_sender_fname, ru.last_name as reply_sender_lname
+                rm.text as reply_text, ru.first_name as reply_sender_fname, ru.last_name as reply_sender_lname,
+                fu.first_name as fwd_user_fname, fu.last_name as fwd_user_lname,
+                fc.title as fwd_chat_title
             FROM messages m
             LEFT JOIN users u ON m.sender_id = u.id
             JOIN chats c ON m.chat_id = c.id
             LEFT JOIN users cu ON c.id = cu.id AND c.type = 'private'
             LEFT JOIN messages rm ON m.reply_to_message_id = rm.message_id AND m.chat_id = rm.chat_id
             LEFT JOIN users ru ON rm.sender_id = ru.id
+            LEFT JOIN users fu ON m.forward_sender_id = fu.id
+            LEFT JOIN chats fc ON m.forward_sender_id = fc.id
             {where_clause}
             ORDER BY m.chat_id, m.date ASC
         """
