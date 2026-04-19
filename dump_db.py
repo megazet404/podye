@@ -51,11 +51,11 @@ def generate_html(data: Dict[str, Any]) -> str:
             lang = html.escape(user['language_code'] or "-")
 
             user_info = (
-                f"<b>Name:</b> <u>{first_name} {last_name}</u><br>"
-                f"<b>Username:</b> @{username}<br>"
-                f"<b>ID:</b> {user['id']}<br>"
-                f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br>"
-                f"<b>Lang:</b> {lang}<br>"
+                f"<b>Name:</b> <u>{first_name} {last_name}</u><br/>"
+                f"<b>Username:</b> @{username}<br/>"
+                f"<b>ID:</b> {user['id']}<br/>"
+                f"<b>Bot:</b> {'Yes' if user['is_bot'] else 'No'}<br/>"
+                f"<b>Lang:</b> {lang}<br/>"
                 f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
             )
 
@@ -115,10 +115,10 @@ def generate_html(data: Dict[str, Any]) -> str:
             d_name = html.escape(chat['display_name'] or "-")
             username = html.escape(chat['username'] or "-")
             chat_info = (
-                f"<b>Name:</b> <u>{d_name}</u><br>"
-                f"<b>Username:</b> @{username}<br>"
-                f"<b>ID:</b> {chat['id']}<br>"
-                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br>"
+                f"<b>Name:</b> <u>{d_name}</u><br/>"
+                f"<b>Username:</b> @{username}<br/>"
+                f"<b>ID:</b> {chat['id']}<br/>"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
                 f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
             )
             html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
@@ -134,12 +134,12 @@ def generate_html(data: Dict[str, Any]) -> str:
             username = html.escape(chat['username'] or "-")
             description = html.escape(chat['description'] or "-")
             chat_info = (
-                f"<b>Title:</b> <u>{d_name}</u><br>"
-                f"<b>Username:</b> @{username}<br>"
-                f"<b>ID:</b> {chat['id']}<br>"
-                f"<b>Type:</b> {html.escape(chat['type'] or '')}<br>"
-                f"<b>Description:</b> {description}<br>"
-                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br>"
+                f"<b>Title:</b> <u>{d_name}</u><br/>"
+                f"<b>Username:</b> @{username}<br/>"
+                f"<b>ID:</b> {chat['id']}<br/>"
+                f"<b>Type:</b> {html.escape(chat['type'] or '')}<br/>"
+                f"<b>Description:</b> {description}<br/>"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
                 f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
             )
             member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
