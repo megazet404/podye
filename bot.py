@@ -31,7 +31,8 @@ async def cmd_start(message: Message, bot: Bot) -> None:
     if message.chat.type == "private":
         if not is_allowed_user(message.from_user.id):
             return # Silent ignore
-        await message.answer("Поехали.")
+        sent_message = await message.answer("Поехали.")
+        collector.process_message(sent_message)
 
 @dp.message()
 async def handle_message(message: Message, bot: Bot) -> None:
@@ -75,7 +76,8 @@ async def handle_my_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
 
     if old_status != "member" and new_status == "member":
         if is_allowed_chat(event.chat.id):
-            await bot.send_message(event.chat.id, "Вы кто такие? Я ва... А, это вы? Ну что ж, готов быть вашим маленьким вредным пидором.")
+            sent_message = await bot.send_message(event.chat.id, "Вы кто такие? Я ва... А, это вы? Ну что ж, готов быть вашим маленьким вредным пидором.")
+            collector.process_message(sent_message)
         else:
             try:
                 await bot.send_message(event.chat.id, "Вы кто такие? Я вас не звал! Идите нахуй!")
