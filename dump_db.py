@@ -118,12 +118,14 @@ def generate_html(data: Dict[str, Any]) -> str:
         for chat in private_chats:
             d_name = html.escape(chat['display_name'] or "-")
             username = html.escape(chat['username'] or "-")
+            msg_count = chat.get('msg_count', 0)
+            msg_link = f"<a href='#chat_msgs_{chat['id']}'>{msg_count}</a>" if msg_count > 0 else "0"
             chat_info = (
                 f"<b>Name:</b> <u>{d_name}</u><br/>"
                 f"<b>Username:</b> @{username}<br/>"
                 f"<b>ID:</b> {chat['id']}<br/>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
-                f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
+                f"<b>Messages:</b> {msg_link}"
             )
             html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
         html_segment.append("</table>")
@@ -137,6 +139,8 @@ def generate_html(data: Dict[str, Any]) -> str:
             d_name = html.escape(chat['display_name'] or "")
             username = html.escape(chat['username'] or "-")
             description = html.escape(chat['description'] or "-")
+            msg_count = chat.get('msg_count', 0)
+            msg_link = f"<a href='#chat_msgs_{chat['id']}'>{msg_count}</a>" if msg_count > 0 else "0"
             chat_info = (
                 f"<b>Title:</b> <u>{d_name}</u><br/>"
                 f"<b>Username:</b> @{username}<br/>"
@@ -144,7 +148,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<b>Type:</b> {html.escape(chat['type'] or '')}<br/>"
                 f"<b>Description:</b> {description}<br/>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
-                f"<b>Messages:</b> <a href='#chat_msgs_{chat['id']}'>link</a>"
+                f"<b>Messages:</b> {msg_link}"
             )
             member_rows = ["<table border='1' cellspacing='0' cellpadding='2' style='width:100%'>"]
             member_rows.append(

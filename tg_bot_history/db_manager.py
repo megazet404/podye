@@ -278,7 +278,8 @@ class DatabaseRepository:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT c.*, u.first_name, u.last_name
+                SELECT c.*, u.first_name, u.last_name,
+                       (SELECT COUNT(*) FROM messages WHERE chat_id = c.id) as msg_count
                 FROM chats c
                 LEFT JOIN users u ON c.id = u.id AND c.type = 'private'
             """)
