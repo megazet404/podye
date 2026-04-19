@@ -125,27 +125,6 @@ def generate_html(data: Dict[str, Any]) -> str:
             segment.append("</table>")
             return "".join(segment)
 
-        def _render_channels(chats: List[Dict[str, Any]]) -> str:
-            segment = ["<h2>Channels</h2>", "<table border='1' cellspacing='0' cellpadding='5'>",
-                       "<tr bgcolor='#ddd'><th>Chat Info</th></tr>"]
-            for chat in chats:
-                d_name = html.escape(chat['display_name'] or "-")
-                username = html.escape(chat['username'] or "-")
-                description = html.escape(chat['description'] or "-")
-                msg_count = chat.get('msg_count', 0)
-                msg_link = f"<a href='#chat_msgs_{chat['id']}'>{msg_count}</a>" if msg_count > 0 else "0"
-                chat_info = (
-                    f"<b>Title:</b> <u>{d_name}</u><br/>"
-                    f"<b>Username:</b> @{username}<br/>"
-                    f"<b>ID:</b> {chat['id']}<br/>"
-                    f"<b>Description:</b> {description}<br/>"
-                    f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
-                    f"<b>Messages:</b> {msg_link}"
-                )
-                segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
-            segment.append("</table>")
-            return "".join(segment)
-
         def _render_groups(chats: List[Dict[str, Any]]) -> str:
             segment = ["<h2>Groups</h2>", "<table border='1' cellspacing='0' cellpadding='5'>",
                        "<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>"]
@@ -187,11 +166,32 @@ def generate_html(data: Dict[str, Any]) -> str:
             segment.append("</table>")
             return "".join(segment)
 
+        def _render_channels(chats: List[Dict[str, Any]]) -> str:
+            segment = ["<h2>Channels</h2>", "<table border='1' cellspacing='0' cellpadding='5'>",
+                       "<tr bgcolor='#ddd'><th>Chat Info</th></tr>"]
+            for chat in chats:
+                d_name = html.escape(chat['display_name'] or "-")
+                username = html.escape(chat['username'] or "-")
+                description = html.escape(chat['description'] or "-")
+                msg_count = chat.get('msg_count', 0)
+                msg_link = f"<a href='#chat_msgs_{chat['id']}'>{msg_count}</a>" if msg_count > 0 else "0"
+                chat_info = (
+                    f"<b>Title:</b> <u>{d_name}</u><br/>"
+                    f"<b>Username:</b> @{username}<br/>"
+                    f"<b>ID:</b> {chat['id']}<br/>"
+                    f"<b>Description:</b> {description}<br/>"
+                    f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
+                    f"<b>Messages:</b> {msg_link}"
+                )
+                segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
+            segment.append("</table>")
+            return "".join(segment)
+
         private_chats = [c for c in chats_data if c['type'] == 'private']
         group_chats   = [c for c in chats_data if c['type'] in ('group', 'supergroup')]
         channel_chats = [c for c in chats_data if c['type'] == 'channel']
 
-        return _render_private(private_chats) + _render_channels(channel_chats) + _render_groups(group_chats)
+        return _render_private(private_chats) + _render_groups(group_chats) + _render_channels(channel_chats)
 
     def generate_messages(messages_data: List[Dict[str, Any]]) -> str:
         if not messages_data:
