@@ -49,7 +49,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
 
 @dp.edited_message()
 async def handle_edited_message(message: Message) -> None:
-    logger.debug("Incoming Edited Message: %s", 
+    logger.debug("Incoming Edited Message: %s",
                  json.dumps(message.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
     if not is_allowed_chat(message.chat.id):

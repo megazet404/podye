@@ -2,7 +2,7 @@
     <identity>
         <name>Telegram Logger Bot (System)</name>
         <purpose>
-            A modular system for monitoring, filtering, and logging Telegram communications. 
+            A modular system for monitoring, filtering, and logging Telegram communications.
             Consists of a bot application and an isolated persistence module.
         </purpose>
     </identity>
@@ -16,7 +16,7 @@
                     Responsible for Access Control (filtering) and orchestrating data flow to the storage module.
                 </file>
                 <file name="config.py">
-                    Configuration manager. Loads environment variables, processes ACLs (ALLOWED_USERS, ALLOWED_CHATS), 
+                    Configuration manager. Loads environment variables, processes ACLs (ALLOWED_USERS, ALLOWED_CHATS),
                     and normalizes Telegram IDs.
                 </file>
                 <file name="dump_db.py">
@@ -51,7 +51,7 @@
 
     <maintenance_and_tools>
         <export>
-            The 'dump_db.py' tool provides a relational view of the captured data. 
+            The 'dump_db.py' tool provides a relational view of the captured data.
             It is used for human-readable audits (HTML) and data migration (JSON).
         </export>
         <deployment>
@@ -62,7 +62,7 @@
 
     <future_expansion>
         <note>
-            The system is designed to provide structured history context for Large Language Models (LLM). 
+            The system is designed to provide structured history context for Large Language Models (LLM).
             The 'tg_bot_history' module serves as the primary data provider for building LLM prompts based on chat history.
         </note>
     </future_expansion>
