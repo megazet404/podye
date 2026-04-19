@@ -1,87 +1,69 @@
-<project_documentation version="1.0" target_audience="Large Language Model (LLM)">
+<project_documentation version="1.1" target_audience="Large Language Model (LLM)">
     <identity>
-        <name>Telegram Logger Bot</name>
+        <name>Telegram Logger Bot (System)</name>
         <purpose>
-            Asynchronous system designed for monitoring, filtering, and persisting Telegram message data, media metadata, and user/chat interactions into a structured SQLite database.
+            A modular system for monitoring, filtering, and logging Telegram communications. 
+            Consists of a bot application and an isolated persistence module.
         </purpose>
     </identity>
 
     <architecture>
-        <environment>Python 3.10+, aiogram 3.x, SQLite 3 (WAL mode).</environment>
-        <components>
-            <file name="main.py" role="Entry point">
-                Initializes the Dispatcher, handles bot polling, and implements high-level access control. Directs unauthorized chats to a "leave" procedure.
-            </file>
-            <file name="config.py" role="Configuration manager">
-                Loads environment variables and JSON configurations. Normalizes Telegram Chat IDs to the standard Bot API format (-100...).
-            </file>
-            <file name="handlers.py" role="Data extractor">
-                Contains logic for parsing incoming Message and ChatMemberUpdated objects. Extracts text, media metadata (photos, videos, documents, voice), and forward origins.
-            </file>
-            <file name="database.py" role="Persistence and Aggregation layer">
-                1. Defines the SQLite schema.
-                2. Executes CRUD operations using UPSERT patterns to maintain data consistency for users and chats.
-                3. Provides complex data aggregation logic for reporting and exports.
-            </file>
-            <file name="dump_db.py" role="Maintenance utility">
-                CLI tool for exporting stored data. Supports JSON format for programmatic use and HTML format for human-readable debugging. Delegates data retrieval and relational aggregation to database.py.
-            </file>
-        </components>
+        <environment>Python 3.10+, aiogram 3.x, SQLite 3.</environment>
+        <structure>
+            <component name="Application Layer (Root)">
+                <file name="bot.py">
+                    Main entry point. Implements aiogram Dispatcher, event handlers, and business logic.
+                    Responsible for Access Control (filtering) and orchestrating data flow to the storage module.
+                </file>
+                <file name="config.py">
+                    Configuration manager. Loads environment variables, processes ACLs (ALLOWED_USERS, ALLOWED_CHATS), 
+                    and normalizes Telegram IDs.
+                </file>
+                <file name="dump_db.py">
+                    Maintenance utility. Exports logged data to JSON or HTML by utilizing the internal logic of the storage module.
+                </file>
+            </component>
+            <component name="Persistence Layer (Module)">
+                <folder name="tg_bot_history">
+                    Isolated module specialized in parsing Telegram objects and SQLite persistence.
+                    Refer to 'tg_bot_history/documentation.ai.xml' for detailed module specs.
+                </folder>
+            </component>
+        </structure>
     </architecture>
-
-    <database_schema>
-        <table name="users">
-            <description>Stores unique Telegram users.</description>
-            <fields>id (PK), username, first_name, last_name, is_bot, language_code, updated_at.</fields>
-        </table>
-        <table name="chats">
-            <description>Stores Telegram groups, supergroups, channels, and private chats.</description>
-            <fields>id (PK), type, title, username, description, updated_at.</fields>
-        </table>
-        <table name="messages">
-            <description>Primary log of all captured messages.</description>
-            <fields>id (PK), tg_id, chat_id (FK), sender_id, reply_to_local_id, forward_sender_id, forward_message_id, forward_sender_name, text, entities (JSON), media_group_id, date, edit_date.</fields>
-        </table>
-        <table name="message_media">
-            <description>Metadata for files attached to messages.</description>
-            <fields>id (PK), message_id (FK), file_id, file_unique_id, file_type, file_size, mime_type, width, height.</fields>
-        </table>
-        <table name="chat_members">
-            <description>Intersection table tracking user activity and status within specific chats.</description>
-            <fields>chat_id (PK), user_id (PK), status, joined_at, left_at, first_activity, last_activity, updated_at.</fields>
-        </table>
-    </database_schema>
 
     <logic_flows>
         <access_control>
-            <private_chats>Only users defined in ALLOWED_USERS are processed.</private_chats>
-            <group_chats>Only chat IDs defined in ALLOWED_CHATS are processed. Unauthorized groups trigger an automated "leave chat" sequence.</group_chats>
+            <mechanism>Explicit Whitelisting (ACL).</mechanism>
+            <logic>
+                1. Check if chat_id is in ALLOWED_CHATS or user_id (for private) is in ALLOWED_USERS.
+                2. If unauthorized in a group: send a farewell message and leave the chat.
+                3. If unauthorized in private: ignore silently.
+            </logic>
         </access_control>
-        <message_processing>
-            1. Validate source chat/user against whitelist.
-            2. Upsert chat and sender (user or sender_chat) info.
-            3. Resolve local ID of the replied-to message if applicable.
-            4. Parse forward origins (user, hidden user, chat, or channel).
-            5. Persist message text and entities.
-            6. Extract and store metadata for all media attachments.
-            7. Update member activity timestamps.
-        </message_processing>
-        <data_export>
-            <retrieval>Data aggregation is handled by the persistence layer to ensure consistency between the bot and maintenance tools.</retrieval>
-            <json_format>Flat representation of database tables for data migration or external processing.</json_format>
-            <html_format>
-                Relational representation for debugging:
-                - Users: Aggregated with their chat memberships and status.
-                - Chats: Aggregated with the list of participating users.
-                - Timestamps: Converted from Unix epoch to human-readable UTC format.
-            </html_format>
-        </data_export>
+        <integration_flow>
+            1. 'bot.py' receives an update (Message, EditedMessage, or ChatMemberUpdated).
+            2. 'bot.py' validates the source against ACLs defined in 'config.py'.
+            3. If valid, 'bot.py' calls the respective processing function from 'tg_bot_history.collectors'.
+            4. The DB_PATH constant is passed from the root configuration to the module functions.
+        </integration_flow>
     </logic_flows>
 
-    <operational_notes>
-        <note>The system ignores messages from unauthorized sources silently or with a farewell message depending on chat type.</note>
-        <note>Media files are not downloaded; only their metadata and Telegram file_ids are stored.</note>
-        <note>SQLite WAL mode is used to ensure concurrency during polling and external dumping.</note>
-        <note>The HTML export format is strictly for manual debugging and audit, utilizing basic formatting without external dependencies (CSS/JS).</note>
-    </operational_notes>
+    <maintenance_and_tools>
+        <export>
+            The 'dump_db.py' tool provides a relational view of the captured data. 
+            It is used for human-readable audits (HTML) and data migration (JSON).
+        </export>
+        <deployment>
+            Requires a .env file with BOT_TOKEN and DB_PATH.
+            The system uses SQLite WAL mode to allow the dump tool to read while the bot is running.
+        </deployment>
+    </maintenance_and_tools>
+
+    <future_expansion>
+        <note>
+            The system is designed to provide structured history context for Large Language Models (LLM). 
+            The 'tg_bot_history' module serves as the primary data provider for building LLM prompts based on chat history.
+        </note>
+    </future_expansion>
 </project_documentation>

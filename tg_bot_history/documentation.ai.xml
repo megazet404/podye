@@ -1,0 +1,73 @@
+<project_documentation version="1.1" target_audience="Large Language Model (LLM)">
+    <identity>
+        <name>tg_bot_history (Module)</name>
+        <purpose>
+            Isolated Python module for monitoring, parsing, and persisting Telegram interaction data into a structured SQLite database.
+        </purpose>
+    </identity>
+
+    <architecture>
+        <environment>Python 3.10+, aiogram 3.x, SQLite 3 (WAL mode).</environment>
+        <components>
+            <file name="db_manager.py" role="Persistence and Aggregation layer">
+                1. Defines the SQLite schema with foreign key constraints and indexes.
+                2. Implements UPSERT patterns for users, chats, and messages to ensure idempotent updates.
+                3. Manages database connections and PRAGMA settings (WAL mode).
+                4. Provides aggregation methods for external reporting tools.
+            </file>
+            <file name="collectors.py" role="Data Extraction Layer">
+                1. Processing logic: parses aiogram objects (Message, ChatMemberUpdated) without business-logic.
+                2. Extracts text, media metadata (file_id, dimensions, size), and forward origins.
+                3. Updates user activity timestamps and membership statuses.
+                4. Requires an explicit database path (db_path) for all operations.
+            </file>
+            <file name="__init__.py" role="Package Interface">
+                Exposes primary functions from collectors.py and db_manager.py for external use.
+            </file>
+        </components>
+    </architecture>
+
+    <database_schema>
+        <table name="users">
+            <description>Unique Telegram users with profile metadata.</description>
+            <fields>id (PK), username, first_name, last_name, is_bot, language_code, updated_at.</fields>
+        </table>
+        <table name="chats">
+            <description>Telegram groups, supergroups, channels, and private chats.</description>
+            <fields>id (PK), type, title, username, description, updated_at.</fields>
+        </table>
+        <table name="messages">
+            <description>Log of captured messages with edit history support.</description>
+            <fields>id (PK), tg_id, chat_id (FK), sender_id, reply_to_local_id, forward_sender_id, forward_message_id, forward_sender_name, original_text, text, entities (JSON), media_group_id, date, edit_date.</fields>
+        </table>
+        <table name="message_media">
+            <description>Metadata for files attached to messages (metadata only, no downloads).</description>
+            <fields>id (PK), message_id (FK), file_id, file_unique_id, file_type, file_size, mime_type, width, height.</fields>
+        </table>
+        <table name="chat_members">
+            <description>Intersection table for user status and activity within specific chats.</description>
+            <fields>chat_id (PK), user_id (PK), status, joined_at, left_at, first_activity, last_activity, updated_at.</fields>
+        </table>
+    </database_schema>
+
+    <integration_logic>
+        <principles>
+            <principle>The module is agnostic of the bot's access control lists (ACLs).</principle>
+            <principle>Caller (e.g., bot.py) is responsible for filtering chats/users before passing data to the module.</principle>
+            <principle>Stateless execution: database paths are injected at the function level.</principle>
+        </principles>
+        <message_flow>
+            1. External trigger (bot handler) validates input.
+            2. Call `process_message(message, db_path)`.
+            3. Module upserts chat/sender info.
+            4. Module resolves reply/forward links.
+            5. Module persists text and media metadata.
+        </message_flow>
+    </integration_logic>
+
+    <operational_notes>
+        <note>The module uses relative imports internally (`from .db_manager import ...`).</note>
+        <note>SQLite WAL mode is enabled to support concurrent read operations by dump tools while the bot is writing.</note>
+        <note>Media files are referenced via Telegram file_ids; the module does not handle binary data storage.</note>
+    </operational_notes>
+</project_documentation>
