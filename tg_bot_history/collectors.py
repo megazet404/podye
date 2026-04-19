@@ -10,17 +10,7 @@ from .db_manager import (
     get_local_message_id, update_message_text, upsert_message
 )
 
-from .config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
-
 logger = logging.getLogger(__name__)
-
-def is_allowed_chat(chat_id: int) -> bool:
-    """Checks if chat_id is in allowed chats or allowed users (for private chats)."""
-    return chat_id in ALLOWED_CHATS or chat_id in ALLOWED_USERS
-
-def is_allowed_user(user_id: int) -> bool:
-    """Checks if user_id is in allowed users."""
-    return user_id in ALLOWED_USERS
 
 def extract_user_data(user: types.User) -> dict:
     return {
@@ -211,12 +201,10 @@ def save_message_to_db(conn, message: types.Message, timestamp: int,
 
     return local_id
 
-def process_message(message: types.Message) -> None:
-    timestamp = int(time.time())
+def process_message(message: types.Message, db_path: str) -> None:
     logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
-
-    conn = get_db_connection(DB_PATH)
-
+    timestamp = int(time.time())
+    conn = get_db_connection(db_path)
     try:
         save_message_to_db(conn, message, timestamp)
 
@@ -231,9 +219,10 @@ def process_message(message: types.Message) -> None:
     finally:
         conn.close()
 
-def process_edited_message(message: types.Message) -> None:
+def process_edited_message(message: types.Message, db_path: str) -> None:
     timestamp = int(time.time())
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(db_path)
+
     try:
         # Using save_message_to_db ensures that an edited message
         # is either updated or created if it was missing.
@@ -241,15 +230,12 @@ def process_edited_message(message: types.Message) -> None:
     finally:
         conn.close()
 
-def process_chat_member_update(event: ChatMemberUpdated) -> None:
+def process_chat_member_update(event: ChatMemberUpdated, db_path: str) -> None:
     timestamp = int(time.time())
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(db_path)
 
     try:
         chat_id = event.chat.id
-        if not is_allowed_chat(chat_id):
-            return
-
         user_id = event.from_user.id
         upsert_user(conn, extract_user_data(event.from_user), timestamp)
 

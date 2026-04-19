@@ -5,15 +5,25 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
-from tg_bot_history.config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
+from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from tg_bot_history.db_manager import init_db
-from tg_bot_history.collectors import process_message, process_edited_message, process_chat_member_update, is_allowed_chat, is_allowed_user
+from tg_bot_history.collectors import (
+    process_message,
+    process_edited_message,
+    process_chat_member_update
+)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+def is_allowed_chat(chat_id: int) -> bool:
+    return chat_id in ALLOWED_CHATS or chat_id in ALLOWED_USERS
+
+def is_allowed_user(user_id: int) -> bool:
+    return user_id in ALLOWED_USERS
 
 dp = Dispatcher()
 
@@ -38,7 +48,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
                 logger.error(f"Failed to leave chat {message.chat.id}: {e}")
         return
 
-    process_message(message)
+    process_message(message, DB_PATH)
 
 @dp.edited_message()
 async def handle_edited_message(message: Message) -> None:
@@ -47,14 +57,15 @@ async def handle_edited_message(message: Message) -> None:
 
     if not is_allowed_chat(message.chat.id):
         return
-
-    process_edited_message(message)
+    process_edited_message(message, DB_PATH)
 
 @dp.chat_member()
 async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
     logger.debug("Incoming ChatMemberUpdated: %s", json.dumps(event.model_dump(mode='json', exclude_none=True), ensure_ascii=False))
 
-    process_chat_member_update(event)
+    if not is_allowed_chat(event.chat.id):
+        return
+    process_chat_member_update(event, DB_PATH)
 
 @dp.my_chat_member()
 async def handle_my_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
