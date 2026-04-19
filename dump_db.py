@@ -120,7 +120,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<b>ID:</b> {chat['id']}<br>"
                 f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}"
             )
-            html_segment.append(f"<tr><td valign='top'>{chat_info}</td></tr>")
+            html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
         html_segment.append("</table>")
 
         # Section: Group Chats
@@ -168,7 +168,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                     f"</tr>"
                 )
             member_rows.append("</table>")
-            html_segment.append(f"<tr><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
+            html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top' width='25%'>{chat_info}</td><td valign='top'>{''.join(member_rows)}</td></tr>")
 
         html_segment.append("</table>")
         return "".join(html_segment)
@@ -202,7 +202,15 @@ def generate_html(data: Dict[str, Any]) -> str:
                 c_name_esc = html.escape(cinfo['name'])
                 c_uname_esc = html.escape(cinfo['username'] or "-")
 
-                html_segment.append(f"<h3>{c_name_esc} ({cid}) @{c_uname_esc}</h3>")
+                # Заголовок обёрнут в ссылку на раздел Chats
+                html_segment.append(
+                    f"<h3>"
+                    f"<a href='#chat_{cid}' style='text-decoration: none; color: inherit;'>"
+                    f"<u>{c_name_esc}</u>"
+                    f"</a>"
+                    f"({cid}) @{c_uname_esc}"
+                    f"</h3>"
+                )
                 html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
                 html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>Content</th></tr>")
 
