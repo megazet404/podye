@@ -9,11 +9,8 @@ from .db_manager import DatabaseRepository
 logger = logging.getLogger(__name__)
 
 class HistoryCollector:
-    def __init__(self, db_path: str):
-        self.repo = DatabaseRepository(db_path)
-
-    def initialize_storage(self) -> None:
-        self.repo.init_db()
+    def __init__(self, repo: DatabaseRepository):
+        self.repo = repo
 
     def _extract_user_data(self, user: types.User) -> dict:
         return {

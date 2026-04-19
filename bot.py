@@ -7,6 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
 from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from tg_bot_history.collectors import HistoryCollector
+from tg_bot_history.db_manager import DatabaseRepository
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,7 +22,9 @@ def is_allowed_user(user_id: int) -> bool:
     return user_id in ALLOWED_USERS
 
 dp = Dispatcher()
-collector = HistoryCollector(DB_PATH)
+
+db_repo = DatabaseRepository(DB_PATH)
+collector = HistoryCollector(db_repo)
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, bot: Bot) -> None:
@@ -90,7 +93,7 @@ async def main():
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Verbose mode enabled")
 
-    collector.initialize_storage()
+    db_repo.init_db()
     bot = Bot(token=BOT_TOKEN)
 
     try:
