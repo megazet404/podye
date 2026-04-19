@@ -104,10 +104,11 @@ def generate_html(data: Dict[str, Any]) -> str:
         return "".join(html_segment)
 
     def generate_chats(chats_data: List[Dict[str, Any]]) -> str:
-        """Sub-function to generate the Users section."""
+        """Sub-function to generate the Chats section."""
 
         private_chats = [c for c in chats_data if c['type'] == 'private']
-        group_chats   = [c for c in chats_data if c['type'] != 'private']
+        group_chats   = [c for c in chats_data if c['type'] in ('group', 'supergroup')]
+        channel_chats = [c for c in chats_data if c['type'] == 'channel']
 
         html_segment  = []
 
@@ -130,8 +131,29 @@ def generate_html(data: Dict[str, Any]) -> str:
             html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
         html_segment.append("</table>")
 
+        # Section: Channels
+        html_segment.append("<h2>Channels</h2>")
+        html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
+        html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th></tr>")
+        for chat in channel_chats:
+            d_name = html.escape(chat['display_name'] or "-")
+            username = html.escape(chat['username'] or "-")
+            description = html.escape(chat['description'] or "-")
+            msg_count = chat.get('msg_count', 0)
+            msg_link = f"<a href='#chat_msgs_{chat['id']}'>{msg_count}</a>" if msg_count > 0 else "0"
+            chat_info = (
+                f"<b>Title:</b> <u>{d_name}</u><br/>"
+                f"<b>Username:</b> @{username}<br/>"
+                f"<b>ID:</b> {chat['id']}<br/>"
+                f"<b>Description:</b> {description}<br/>"
+                f"<b>Updated:</b> {format_timestamp(chat['updated_at'])}<br/>"
+                f"<b>Messages:</b> {msg_link}"
+            )
+            html_segment.append(f"<tr id='chat_{chat['id']}'><td valign='top'>{chat_info}</td></tr>")
+        html_segment.append("</table>")
+
         # Section: Group Chats
-        html_segment.append("<h2>Groups / Channels</h2>")
+        html_segment.append("<h2>Groups</h2>")
         html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
         html_segment.append("<tr bgcolor='#ddd'><th>Chat Info</th><th>Members</th></tr>")
 
