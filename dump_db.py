@@ -79,9 +79,13 @@ def generate_html(data: Dict[str, Any]) -> str:
                 for m in user['memberships']:
                     d_name = html.escape(m['display_name'] or "")
                     c_username = html.escape(m['chat_username'] or "-")
+
+                    chat_anchor = f"chat_{m['chat_id']}"
+                    chat_link = f"<a href='#{chat_anchor}' style='text-decoration: none; color: inherit;'><u>{d_name}</u></a>"
+
                     membership_rows.append(
                         f"<tr>"
-                        f"<td><u>{d_name}</u><br/>({m['chat_id']})<br/>@{c_username}</td>"
+                        f"<td>{chat_link}<br/>({m['chat_id']})<br/>@{c_username}</td>"
                         f"<td>{html.escape(m['status'])}</td>"
                         f"<td>{format_timestamp(m['joined_at'])}</td>"
                         f"<td>{format_timestamp(m['left_at'])}</td>"
