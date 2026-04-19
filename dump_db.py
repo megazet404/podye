@@ -59,6 +59,8 @@ def generate_html(data: Dict[str, Any]) -> str:
                 f"<b>Updated:</b> {format_timestamp(user['updated_at'])}"
             )
 
+            user_anchor_id = f"user_{user['id']}"
+
             # Memberships cell with nested table
             membership_rows = []
             if user['memberships']:
@@ -92,7 +94,7 @@ def generate_html(data: Dict[str, Any]) -> str:
             else:
                 membership_rows.append("No active memberships found.")
 
-            html_segment.append(f"<tr><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
+            html_segment.append(f"<tr id='{user_anchor_id}'><td valign='top'>{user_info}</td><td valign='top'>{''.join(membership_rows)}</td></tr>")
 
         html_segment.append("</table>")
         return "".join(html_segment)
@@ -207,7 +209,20 @@ def generate_html(data: Dict[str, Any]) -> str:
                 for m in cinfo["msgs"]:
                     sender_name = f"{m['sender_fname'] or ''} {m['sender_lname'] or ''}".strip() or "Unknown"
                     s_uname_esc = html.escape(m['sender_uname'] or "-")
-                    sender = f"<u>{html.escape(sender_name)}</u><br/>({m['sender_id']})<br/>@{s_uname_esc}"
+
+                    sender_id = m['sender_id']
+                    if sender_id:
+                        sender_link = f"<a href='#user_{sender_id}' style='text-decoration: none; color: inherit;'>"
+                        sender_link_end = "</a>"
+                    else:
+                        sender_link = ""
+                        sender_link_end = ""
+
+                    sender = (
+                        f"{sender_link}<u>{html.escape(sender_name)}</u>{sender_link_end}<br/>"
+                        f"({sender_id})<br/>"
+                        f"@{s_uname_esc}"
+                    )
 
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
@@ -222,7 +237,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                         r_text = html.escape(display_text).replace("\n", "<br/>")
 
                         reply_target_id = f"msg_{m['chat_id']}_{m['reply_to_message_id']}"
-                        
+
                         reply_block = (
                             f"<a href='#{reply_target_id}' style='text-decoration: none; color: inherit;'>"
                             f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #0088cc; "
