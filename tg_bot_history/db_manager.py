@@ -38,12 +38,10 @@ class DatabaseRepository:
             );
 
             CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tg_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
                 chat_id INTEGER NOT NULL,
                 sender_id INTEGER,
-                reply_to_local_id INTEGER,
-                reply_to_tg_id INTEGER,
+                reply_to_message_id INTEGER,
                 quote_text TEXT,
                 quote_entities TEXT,
                 quote_offset INTEGER,
@@ -57,12 +55,13 @@ class DatabaseRepository:
                 media_group_id TEXT,
                 date INTEGER NOT NULL,
                 edit_date INTEGER,
-                UNIQUE (tg_id, chat_id)
+                PRIMARY KEY (message_id, chat_id)
             );
 
             CREATE TABLE IF NOT EXISTS message_media (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message_id INTEGER NOT NULL,
+                chat_id INTEGER NOT NULL,
                 file_id TEXT NOT NULL,
                 file_unique_id TEXT NOT NULL,
                 file_type TEXT NOT NULL,
@@ -70,7 +69,8 @@ class DatabaseRepository:
                 mime_type TEXT,
                 file_path TEXT,
                 width INTEGER,
-                height INTEGER
+                height INTEGER,
+                FOREIGN KEY (message_id, chat_id) REFERENCES messages (message_id, chat_id)
             );
 
             CREATE TABLE IF NOT EXISTS chat_members (
@@ -139,17 +139,16 @@ class DatabaseRepository:
             ))
             logger.debug(f"Chat UPSERT: id={chat_data.get('id')}")
 
-    def upsert_message(self, message_data: dict) -> int:
+    def upsert_message(self, message_data: dict) -> None:
         with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+            conn.execute("""
             INSERT INTO messages
-            (tg_id, chat_id, sender_id, reply_to_local_id, reply_to_tg_id,
+            (message_id, chat_id, sender_id, reply_to_message_id,
              quote_text, quote_entities, quote_offset, quote_is_manual,
              forward_sender_id, forward_message_id, forward_sender_name,
              original_text, text, entities, media_group_id, date, edit_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (tg_id, chat_id) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (message_id, chat_id) DO UPDATE SET
                 text = CASE
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
                     THEN excluded.text ELSE messages.text END,
@@ -160,11 +159,10 @@ class DatabaseRepository:
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
                     THEN excluded.edit_date ELSE messages.edit_date END
             """, (
-                message_data.get("tg_id"),
+                message_data.get("message_id"),
                 message_data.get("chat_id"),
                 message_data.get("sender_id"),
-                message_data.get("reply_to_local_id"),
-                message_data.get("reply_to_tg_id"),
+                message_data.get("reply_to_message_id"),
                 message_data.get("quote_text"),
                 message_data.get("quote_entities"),
                 message_data.get("quote_offset"),
@@ -179,19 +177,17 @@ class DatabaseRepository:
                 message_data.get("date"),
                 message_data.get("edit_date")
             ))
-            cursor.execute("SELECT id FROM messages WHERE tg_id = ? AND chat_id = ?",
-                           (message_data.get("tg_id"), message_data.get("chat_id")))
-            return cursor.fetchone()[0]
 
-    def insert_media(self, message_id: int, media_list: List[dict]) -> None:
+    def insert_media(self, message_id: int, chat_id: int, media_list: List[dict]) -> None:
         with self._get_connection() as conn:
             for media in media_list:
                 conn.execute("""
                 INSERT OR IGNORE INTO message_media
-                (message_id, file_id, file_unique_id, file_type, file_size, mime_type, file_path, width, height)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (message_id, chat_id, file_id, file_unique_id, file_type, file_size, mime_type, file_path, width, height)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     message_id,
+                    chat_id,
                     media.get("file_id"),
                     media.get("file_unique_id"),
                     media.get("file_type"),
@@ -331,7 +327,7 @@ class DatabaseRepository:
             LEFT JOIN users u ON m.sender_id = u.id
             JOIN chats c ON m.chat_id = c.id
             LEFT JOIN users cu ON c.id = cu.id AND c.type = 'private'
-            LEFT JOIN messages rm ON m.reply_to_tg_id = rm.tg_id AND m.chat_id = rm.chat_id
+            LEFT JOIN messages rm ON m.reply_to_message_id = rm.message_id AND m.chat_id = rm.chat_id
             LEFT JOIN users ru ON rm.sender_id = ru.id
             {where_clause}
             ORDER BY m.chat_id, m.date ASC

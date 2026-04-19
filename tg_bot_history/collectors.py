@@ -117,7 +117,7 @@ class HistoryCollector:
         return forward_sender_id, forward_message_id, forward_sender_name
 
     def _save_message_to_db(self, message: types.Message, timestamp: int,
-                         update_activity: bool = True) -> Optional[int]:
+                         update_activity: bool = True) -> None:
         """Internal helper to coordinate extraction and repository calls."""
         chat_id = message.chat.id
         self.repo.upsert_chat(self._extract_chat_data(message.chat), timestamp)
@@ -134,13 +134,11 @@ class HistoryCollector:
             sender_id = message.sender_chat.id
             self.repo.upsert_chat(self._extract_chat_data(message.sender_chat), timestamp)
 
-        reply_to_local_id = None
-        reply_to_tg_id = None
+        reply_to_message_id = None
         if message.reply_to_message:
             # Recursive call without conn passing
             self._save_message_to_db(message.reply_to_message, timestamp, update_activity=False)
-            reply_to_tg_id = message.reply_to_message.message_id
-            reply_to_local_id = self.repo.get_local_message_id(reply_to_tg_id, chat_id)
+            reply_to_message_id = message.reply_to_message.message_id
 
         forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
         if forward_sender_id and forward_sender_id > 0:
@@ -172,11 +170,10 @@ class HistoryCollector:
                 quote_entities = json.dumps([e.model_dump() for e in quote.entities])
 
         message_data = {
-            "tg_id": message.message_id,
+            "message_id": message.message_id,
             "chat_id": chat_id,
             "sender_id": sender_id,
-            "reply_to_local_id": reply_to_local_id,
-            "reply_to_tg_id": reply_to_tg_id,
+            "reply_to_message_id": reply_to_message_id,
             "quote_text": quote_text,
             "quote_entities": quote_entities,
             "quote_offset": quote_offset,
@@ -191,12 +188,10 @@ class HistoryCollector:
             "edit_date": edit_date_ts
         }
 
-        local_id = self.repo.upsert_message(message_data)
+        self.repo.upsert_message(message_data)
         media_list = self._extract_media_data(message)
         if media_list:
-            self.repo.insert_media(local_id, media_list)
-
-        return local_id
+            self.repo.insert_media(message.message_id, chat_id, media_list)
 
     def process_message(self, message: types.Message) -> None:
         logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")

@@ -212,7 +212,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
                     reply_block = ""
-                    if m.get('reply_to_tg_id') is not None:
+                    if m.get('reply_to_message_id') is not None:
                         quote_text = m.get('quote_text')
                         replied_full_text = m.get('reply_text')
 
