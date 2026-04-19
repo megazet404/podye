@@ -141,9 +141,14 @@ class HistoryCollector:
             reply_to_message_id = message.reply_to_message.message_id
 
         forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
-        if forward_sender_id and forward_sender_id > 0:
-            if message.forward_origin and message.forward_origin.type == "user":
-                self.repo.upsert_user(self._extract_user_data(message.forward_origin.sender_user), timestamp)
+        if forward_sender_id:
+            origin = message.forward_origin
+            if origin.type == "user":
+                self.repo.upsert_user(self._extract_user_data(origin.sender_user), timestamp)
+            elif origin.type == "chat":
+                self.repo.upsert_chat(self._extract_chat_data(origin.sender_chat), timestamp)
+            elif origin.type == "channel":
+                self.repo.upsert_chat(self._extract_chat_data(origin.chat), timestamp)
 
         entities_list = message.entities or message.caption_entities
         entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
