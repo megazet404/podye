@@ -162,9 +162,13 @@ def generate_html(data: Dict[str, Any]) -> str:
                 m_fname = html.escape(m['first_name'] or "")
                 m_lname = html.escape(m['last_name'] or "")
                 m_uname = html.escape(m['username'] or "-")
+
+                user_anchor = f"user_{m['user_id']}"
+                user_link = f"<a href='#{user_anchor}' style='text-decoration: none; color: inherit;'><u>{m_fname} {m_lname}</u></a>"
+
                 member_rows.append(
                     f"<tr>"
-                    f"<td><u>{m_fname} {m_lname}</u><br/>({m['user_id']})<br/>@{m_uname}</td>"
+                    f"<td>{user_link}<br/>({m['user_id']})<br/>@{m_uname}</td>"
                     f"<td>{html.escape(m['status'] or '')}</td>"
                     f"<td>{format_timestamp(m['joined_at'])}</td>"
                     f"<td>{format_timestamp(m['left_at'])}</td>"
