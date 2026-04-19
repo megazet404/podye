@@ -44,6 +44,10 @@ class DatabaseRepository:
                 sender_id INTEGER,
                 reply_to_local_id INTEGER,
                 reply_to_tg_id INTEGER,
+                quote_text TEXT,
+                quote_entities TEXT,
+                quote_offset INTEGER,
+                quote_is_manual INTEGER,
                 forward_sender_id INTEGER,
                 forward_message_id INTEGER,
                 forward_sender_name TEXT,
@@ -141,9 +145,10 @@ class DatabaseRepository:
             cursor.execute("""
             INSERT INTO messages
             (tg_id, chat_id, sender_id, reply_to_local_id, reply_to_tg_id,
+             quote_text, quote_entities, quote_offset, quote_is_manual,
              forward_sender_id, forward_message_id, forward_sender_name,
              original_text, text, entities, media_group_id, date, edit_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (tg_id, chat_id) DO UPDATE SET
                 text = CASE
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
@@ -160,6 +165,10 @@ class DatabaseRepository:
                 message_data.get("sender_id"),
                 message_data.get("reply_to_local_id"),
                 message_data.get("reply_to_tg_id"),
+                message_data.get("quote_text"),
+                message_data.get("quote_entities"),
+                message_data.get("quote_offset"),
+                message_data.get("quote_is_manual"),
                 message_data.get("forward_sender_id"),
                 message_data.get("forward_message_id"),
                 message_data.get("forward_sender_name"),

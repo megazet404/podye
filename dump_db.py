@@ -212,17 +212,20 @@ def generate_html(data: Dict[str, Any]) -> str:
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
                     reply_block = ""
-                    if m.get('reply_text') is not None or m.get('reply_sender_fname'):
+                    if m.get('reply_to_tg_id') is not None:
+                        quote_text = m.get('quote_text')
+                        replied_full_text = m.get('reply_text')
+
+                        display_text = quote_text if quote_text else (replied_full_text if replied_full_text else "[Media]")
+
                         r_sender = f"{m['reply_sender_fname'] or ''} {m['reply_sender_lname'] or ''}".strip() or "Unknown"
-                        raw_reply_text = m.get('reply_text') if m.get('reply_text') else "[Media]"
-                        r_text = html.escape(raw_reply_text).replace("\n", "<br/>")
+                        r_text = html.escape(display_text).replace("\n", "<br/>")
 
                         reply_block = (
                             f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #0088cc; "
                             f"padding: 2px 0 2px 10px; margin-bottom: 8px; background: #f4f4f4;'>"
                             f"<b>{html.escape(r_sender)}:</b><br/>{r_text}</div>"
                         )
-                    # ...
 
                     original = ""
                     if m['original_text'] and m['original_text'] != m['text']:

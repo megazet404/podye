@@ -117,7 +117,7 @@ class HistoryCollector:
         return forward_sender_id, forward_message_id, forward_sender_name
 
     def _save_message_to_db(self, message: types.Message, timestamp: int,
-                             update_activity: bool = True) -> Optional[int]:
+                         update_activity: bool = True) -> Optional[int]:
         """Internal helper to coordinate extraction and repository calls."""
         chat_id = message.chat.id
         self.repo.upsert_chat(self._extract_chat_data(message.chat), timestamp)
@@ -158,12 +158,29 @@ class HistoryCollector:
             edit_val = message.edit_date
             edit_date_ts = int(edit_val.timestamp()) if hasattr(edit_val, 'timestamp') else int(edit_val)
 
+        quote_text = None
+        quote_entities = None
+        quote_offset = None
+        quote_is_manual = None
+
+        if message.quote:
+            quote = message.quote
+            quote_text = quote.text
+            quote_offset = quote.position
+            quote_is_manual = 1 if quote.is_manual else 0
+            if quote.entities:
+                quote_entities = json.dumps([e.model_dump() for e in quote.entities])
+
         message_data = {
             "tg_id": message.message_id,
             "chat_id": chat_id,
             "sender_id": sender_id,
             "reply_to_local_id": reply_to_local_id,
             "reply_to_tg_id": reply_to_tg_id,
+            "quote_text": quote_text,
+            "quote_entities": quote_entities,
+            "quote_offset": quote_offset,
+            "quote_is_manual": quote_is_manual,
             "forward_sender_id": forward_sender_id,
             "forward_message_id": forward_message_id,
             "forward_sender_name": forward_sender_name,
