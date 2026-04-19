@@ -7,11 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
 from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
 from tg_bot_history.db_manager import init_db
-from tg_bot_history.collectors import (
-    process_message,
-    process_edited_message,
-    process_chat_member_update
-)
+from tg_bot_history.collectors import HistoryCollector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +22,7 @@ def is_allowed_user(user_id: int) -> bool:
     return user_id in ALLOWED_USERS
 
 dp = Dispatcher()
+collector = HistoryCollector(DB_PATH)
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, bot: Bot) -> None:
@@ -48,7 +45,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
                 logger.error(f"Failed to leave chat {message.chat.id}: {e}")
         return
 
-    process_message(message, DB_PATH)
+    collector.process_message(message)
 
 @dp.edited_message()
 async def handle_edited_message(message: Message) -> None:
@@ -57,7 +54,7 @@ async def handle_edited_message(message: Message) -> None:
 
     if not is_allowed_chat(message.chat.id):
         return
-    process_edited_message(message, DB_PATH)
+    collector.process_edited_message(message)
 
 @dp.chat_member()
 async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
@@ -65,7 +62,7 @@ async def handle_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:
 
     if not is_allowed_chat(event.chat.id):
         return
-    process_chat_member_update(event, DB_PATH)
+    collector.process_chat_member_update(event)
 
 @dp.my_chat_member()
 async def handle_my_chat_member(event: ChatMemberUpdated, bot: Bot) -> None:

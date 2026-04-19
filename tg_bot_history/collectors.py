@@ -1,252 +1,229 @@
 import json
 import time
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from aiogram import types
 from aiogram.types import ChatMemberUpdated
 from .db_manager import (
-    get_db_connection, upsert_user, upsert_chat, insert_message,
+    get_db_connection, upsert_user, upsert_chat,
     insert_media, update_chat_member_activity, update_chat_member_status,
-    get_local_message_id, update_message_text, upsert_message
+    get_local_message_id, upsert_message
 )
 
 logger = logging.getLogger(__name__)
 
-def extract_user_data(user: types.User) -> dict:
-    return {
-        "id": user.id,
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "is_bot": user.is_bot,
-        "language_code": user.language_code
-    }
+class HistoryCollector:
+    def __init__(self, db_path: str):
+        self.db_path = db_path
 
-def extract_chat_data(chat: types.Chat) -> dict:
-    return {
-        "id": chat.id,
-        "type": chat.type,
-        "title": chat.title,
-        "username": chat.username,
-        "description": chat.description if hasattr(chat, 'description') else None
-    }
+    def _extract_user_data(self, user: types.User) -> dict:
+        return {
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "is_bot": user.is_bot,
+            "language_code": user.language_code
+        }
 
-def extract_media_data(message: types.Message) -> List[dict]:
-    media_list = []
+    def _extract_chat_data(self, chat: types.Chat) -> dict:
+        return {
+            "id": chat.id,
+            "type": chat.type,
+            "title": chat.title,
+            "username": chat.username,
+            "description": chat.description if hasattr(chat, 'description') else None
+        }
 
-    if message.photo:
-        for photo in message.photo:
+    def _extract_media_data(self, message: types.Message) -> List[dict]:
+        media_list = []
+        
+        # Mapping logic for different media types
+        if message.photo:
+            for photo in message.photo:
+                media_list.append({
+                    "file_id": photo.file_id,
+                    "file_unique_id": photo.file_unique_id,
+                    "file_type": "photo",
+                    "file_size": photo.file_size,
+                    "mime_type": "image/jpeg",
+                    "width": photo.width,
+                    "height": photo.height
+                })
+
+        if message.document:
             media_list.append({
-                "file_id": photo.file_id,
-                "file_unique_id": photo.file_unique_id,
-                "file_type": "photo",
-                "file_size": photo.file_size,
-                "mime_type": "image/jpeg",
-                "file_path": None,
-                "width": photo.width,
-                "height": photo.height
+                "file_id": message.document.file_id,
+                "file_unique_id": message.document.file_unique_id,
+                "file_type": "document",
+                "file_size": message.document.file_size,
+                "mime_type": message.document.mime_type
             })
 
-    if message.document:
-        media_list.append({
-            "file_id": message.document.file_id,
-            "file_unique_id": message.document.file_unique_id,
-            "file_type": "document",
-            "file_size": message.document.file_size,
-            "mime_type": message.document.mime_type,
-            "file_path": None,
-            "width": None,
-            "height": None
-        })
+        if message.video:
+            media_list.append({
+                "file_id": message.video.file_id,
+                "file_unique_id": message.video.file_unique_id,
+                "file_type": "video",
+                "file_size": message.video.file_size,
+                "mime_type": message.video.mime_type,
+                "width": message.video.width,
+                "height": message.video.height
+            })
 
-    if message.video:
-        media_list.append({
-            "file_id": message.video.file_id,
-            "file_unique_id": message.video.file_unique_id,
-            "file_type": "video",
-            "file_size": message.video.file_size,
-            "mime_type": message.video.mime_type,
-            "file_path": None,
-            "width": message.video.width,
-            "height": message.video.height
-        })
+        if message.voice:
+            media_list.append({
+                "file_id": message.voice.file_id,
+                "file_unique_id": message.voice.file_unique_id,
+                "file_type": "voice",
+                "file_size": message.voice.file_size,
+                "mime_type": message.voice.mime_type
+            })
 
-    if message.voice:
-        media_list.append({
-            "file_id": message.voice.file_id,
-            "file_unique_id": message.voice.file_unique_id,
-            "file_type": "voice",
-            "file_size": message.voice.file_size,
-            "mime_type": message.voice.mime_type,
-            "file_path": None,
-            "width": None,
-            "height": None
-        })
+        if message.audio:
+            media_list.append({
+                "file_id": message.audio.file_id,
+                "file_unique_id": message.audio.file_unique_id,
+                "file_type": "audio",
+                "file_size": message.audio.file_size,
+                "mime_type": message.audio.mime_type
+            })
 
-    if message.audio:
-        media_list.append({
-            "file_id": message.audio.file_id,
-            "file_unique_id": message.audio.file_unique_id,
-            "file_type": "audio",
-            "file_size": message.audio.file_size,
-            "mime_type": message.audio.mime_type,
-            "file_path": None,
-            "width": None,
-            "height": None
-        })
+        if message.video_note:
+            media_list.append({
+                "file_id": message.video_note.file_id,
+                "file_unique_id": message.video_note.file_unique_id,
+                "file_type": "video_note",
+                "file_size": message.video_note.file_size,
+                "mime_type": "video/mp4"
+            })
 
-    if message.video_note:
-        media_list.append({
-            "file_id": message.video_note.file_id,
-            "file_unique_id": message.video_note.file_unique_id,
-            "file_type": "video_note",
-            "file_size": message.video_note.file_size,
-            "mime_type": "video/mp4",
-            "file_path": None,
-            "width": None,
-            "height": None
-        })
+        return media_list
 
-    return media_list
+    def _extract_forward_sender_info(self, message: types.Message) -> tuple:
+        forward_sender_id = None
+        forward_message_id = None
+        forward_sender_name = None
 
-def extract_forward_sender_info(message: types.Message) -> tuple:
-    forward_sender_id = None
-    forward_message_id = None
-    forward_sender_name = None
+        if message.forward_origin:
+            if message.forward_origin.type == "user":
+                forward_sender_id = message.forward_origin.sender_user.id
+            elif message.forward_origin.type == "chat":
+                forward_sender_id = message.forward_origin.sender_chat.id
+            elif message.forward_origin.type == "channel":
+                forward_sender_id = message.forward_origin.chat.id
+                forward_message_id = message.forward_origin.message_id
+            elif message.forward_origin.type == "hidden_user":
+                forward_sender_name = message.forward_origin.sender_user_name
 
-    if message.forward_origin:
-        if message.forward_origin.type == "user":
-            forward_sender_id = message.forward_origin.sender_user.id
-        elif message.forward_origin.type == "chat":
-            forward_sender_id = message.forward_origin.sender_chat.id
-        elif message.forward_origin.type == "channel":
-            forward_sender_id = message.forward_origin.chat.id
-            forward_message_id = message.forward_origin.message_id
-        elif message.forward_origin.type == "hidden_user":
-            forward_sender_name = message.forward_origin.sender_user_name
+            if hasattr(message.forward_origin, 'message_id'):
+                forward_message_id = message.forward_origin.message_id
 
-        if hasattr(message.forward_origin, 'message_id'):
-            forward_message_id = message.forward_origin.message_id
+        return forward_sender_id, forward_message_id, forward_sender_name
 
-    return forward_sender_id, forward_message_id, forward_sender_name
-
-def save_message_to_db(conn, message: types.Message, timestamp: int,
+    def _save_message_to_db(self, conn, message: types.Message, timestamp: int,
                              update_activity: bool = True) -> Optional[int]:
-    """Helper to extract data and upsert message with its media and sender info."""
-    chat_id = message.chat.id
+        chat_id = message.chat.id
+        upsert_chat(conn, self._extract_chat_data(message.chat), timestamp)
 
-    upsert_chat(conn, extract_chat_data(message.chat), timestamp)
+        sender_id = None
+        if message.from_user:
+            sender_id = message.from_user.id
+            if sender_id > 0:
+                upsert_user(conn, self._extract_user_data(message.from_user), timestamp)
+                if update_activity:
+                    update_chat_member_activity(conn, chat_id, sender_id, timestamp)
 
-    sender_id = None
-    if message.from_user:
-        sender_id = message.from_user.id
-        if sender_id > 0:
-            upsert_user(conn, extract_user_data(message.from_user), timestamp)
-            if update_activity:
-                update_chat_member_activity(conn, chat_id, sender_id, timestamp)
+        if message.sender_chat:
+            sender_id = message.sender_chat.id
+            upsert_chat(conn, self._extract_chat_data(message.sender_chat), timestamp)
 
-    if message.sender_chat:
-        sender_id = message.sender_chat.id
-        upsert_chat(conn, extract_chat_data(message.sender_chat), timestamp)
+        reply_to_local_id = None
+        reply_to_tg_id = None
+        if message.reply_to_message:
+            self._save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
+            reply_to_tg_id = message.reply_to_message.message_id
+            reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
 
-    reply_to_local_id = None
-    reply_to_tg_id = None
-    if message.reply_to_message:
-        # Recursive call to save the replied-to message first
-        # We don't update activity for the old message's sender here
-        save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
+        forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
+        if forward_sender_id and forward_sender_id > 0:
+            if message.forward_origin and message.forward_origin.type == "user":
+                upsert_user(conn, self._extract_user_data(message.forward_origin.sender_user), timestamp)
 
-        reply_to_tg_id = message.reply_to_message.message_id
-        reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
+        entities_list = message.entities or message.caption_entities
+        entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
 
-    forward_sender_id, forward_message_id, forward_sender_name = extract_forward_sender_info(message)
-    # Forwarding logic remains the same...
-    if forward_sender_id and forward_sender_id > 0:
-        if message.forward_origin and message.forward_origin.type == "user":
-            upsert_user(conn, extract_user_data(message.forward_origin.sender_user), timestamp)
+        date_val = message.date
+        date_ts = int(date_val.timestamp()) if hasattr(date_val, 'timestamp') else int(date_val)
 
-    entities_list = message.entities or message.caption_entities
-    entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
+        edit_date_ts = None
+        if message.edit_date:
+            edit_val = message.edit_date
+            edit_date_ts = int(edit_val.timestamp()) if hasattr(edit_val, 'timestamp') else int(edit_val)
 
-    # Safe timestamp extraction
-    date_val = message.date
-    date_ts = int(date_val.timestamp()) if hasattr(date_val, 'timestamp') else int(date_val)
+        message_data = {
+            "tg_id": message.message_id,
+            "chat_id": chat_id,
+            "sender_id": sender_id,
+            "reply_to_local_id": reply_to_local_id,
+            "reply_to_tg_id": reply_to_tg_id,
+            "forward_sender_id": forward_sender_id,
+            "forward_message_id": forward_message_id,
+            "forward_sender_name": forward_sender_name,
+            "text": message.text or message.caption,
+            "entities": entities_json,
+            "media_group_id": message.media_group_id,
+            "date": date_ts,
+            "edit_date": edit_date_ts
+        }
 
-    edit_date_ts = None
-    if message.edit_date:
-        edit_val = message.edit_date
-        edit_date_ts = int(edit_val.timestamp()) if hasattr(edit_val, 'timestamp') else int(edit_val)
+        local_id = upsert_message(conn, message_data)
+        media_list = self._extract_media_data(message)
+        if media_list:
+            insert_media(conn, local_id, media_list)
 
-    message_data = {
-        "tg_id": message.message_id,
-        "chat_id": chat_id,
-        "sender_id": sender_id,
-        "reply_to_local_id": reply_to_local_id,
-        "reply_to_tg_id": reply_to_tg_id,
-        "forward_sender_id": forward_sender_id,
-        "forward_message_id": forward_message_id,
-        "forward_sender_name": forward_sender_name,
-        "text": message.text or message.caption,
-        "entities": entities_json,
-        "media_group_id": message.media_group_id,
-        "date": date_ts,
-        "edit_date": edit_date_ts
-    }
+        return local_id
 
-    local_id = upsert_message(conn, message_data)
+    def process_message(self, message: types.Message) -> None:
+        logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
+        timestamp = int(time.time())
+        conn = get_db_connection(self.db_path)
+        try:
+            self._save_message_to_db(conn, message, timestamp)
 
-    media_list = extract_media_data(message)
-    if media_list:
-        insert_media(conn, local_id, media_list)
+            if message.new_chat_members:
+                for member in message.new_chat_members:
+                    upsert_user(conn, self._extract_user_data(member), timestamp)
+                    update_chat_member_status(conn, message.chat.id, member.id, "member", timestamp)
 
-    return local_id
+            if message.left_chat_member:
+                update_chat_member_status(conn, message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
+        finally:
+            conn.close()
 
-def process_message(message: types.Message, db_path: str) -> None:
-    logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
-    timestamp = int(time.time())
-    conn = get_db_connection(db_path)
-    try:
-        save_message_to_db(conn, message, timestamp)
+    def process_edited_message(self, message: types.Message) -> None:
+        timestamp = int(time.time())
+        conn = get_db_connection(self.db_path)
+        try:
+            self._save_message_to_db(conn, message, timestamp, update_activity=False)
+        finally:
+            conn.close()
 
-        # Handle service messages (members join/leave)
-        if message.new_chat_members:
-            for member in message.new_chat_members:
-                upsert_user(conn, extract_user_data(member), timestamp)
-                update_chat_member_status(conn, message.chat.id, member.id, "member", timestamp)
+    def process_chat_member_update(self, event: ChatMemberUpdated) -> None:
+        timestamp = int(time.time())
+        conn = get_db_connection(self.db_path)
+        try:
+            chat_id = event.chat.id
+            user_id = event.from_user.id
+            upsert_user(conn, self._extract_user_data(event.from_user), timestamp)
 
-        if message.left_chat_member:
-            update_chat_member_status(conn, message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
-    finally:
-        conn.close()
+            old_status = event.old_chat_member.status
+            new_status = event.new_chat_member.status
 
-def process_edited_message(message: types.Message, db_path: str) -> None:
-    timestamp = int(time.time())
-    conn = get_db_connection(db_path)
+            is_left = new_status in ["left", "kicked"]
+            update_chat_member_status(conn, chat_id, user_id, new_status, timestamp, is_left)
 
-    try:
-        # Using save_message_to_db ensures that an edited message
-        # is either updated or created if it was missing.
-        save_message_to_db(conn, message, timestamp, update_activity=False)
-    finally:
-        conn.close()
-
-def process_chat_member_update(event: ChatMemberUpdated, db_path: str) -> None:
-    timestamp = int(time.time())
-    conn = get_db_connection(db_path)
-
-    try:
-        chat_id = event.chat.id
-        user_id = event.from_user.id
-        upsert_user(conn, extract_user_data(event.from_user), timestamp)
-
-        old_status = event.old_chat_member.status
-        new_status = event.new_chat_member.status
-
-        is_left = new_status in ["left", "kicked"]
-        update_chat_member_status(conn, chat_id, user_id, new_status, timestamp, is_left)
-
-        if not is_left:
-            update_chat_member_activity(conn, chat_id, user_id, timestamp, new_status)
-
-    finally:
-        conn.close()
+            if not is_left:
+                update_chat_member_activity(conn, chat_id, user_id, timestamp, new_status)
+        finally:
+            conn.close()
