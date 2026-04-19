@@ -1,4 +1,4 @@
-<project_documentation version="1.2" target_audience="Large Language Model (LLM)">
+<project_documentation target_audience="Large Language Model (LLM)">
     <identity>
         <name>tg_bot_history (Module)</name>
         <purpose>
@@ -16,11 +16,10 @@
                 4. Provides high-level aggregation methods for reporting and exporting.
             </class>
             <class name="HistoryCollector" file="collectors.py" role="Service Layer / Orchestrator">
-                1. Primary interface for the application layer.
-                2. Manages an internal instance of DatabaseRepository.
+                1. Primary interface for the application layer for data ingestion.
+                2. Receives an instance of DatabaseRepository via constructor (Dependency Injection).
                 3. Contains private methods for extracting metadata from aiogram objects.
                 4. Orchestrates the flow: Extract -> Transform -> Persist.
-                5. Provides initialize_storage() to abstract DB setup.
             </class>
         </components>
     </architecture>
@@ -50,17 +49,18 @@
 
     <integration_logic>
         <principles>
-            <principle>Stateful Interaction: Path-based instantiation of the HistoryCollector class.</principle>
+            <principle>Stateful Interaction: Dependency-based instantiation of the HistoryCollector class.</principle>
             <principle>Encapsulation: DatabaseRepository handles its own connection lifecycle per method call.</principle>
             <principle>Agnosticism: The module remains independent of the bot's access control lists (ACLs).</principle>
         </principles>
         <initialization_flow>
-            1. Instantiate collector = HistoryCollector(db_path).
-            2. Call collector.initialize_storage() to ensure schema integrity.
+            1. Instantiate repo = DatabaseRepository(db_path).
+            2. Call repo.init_db() to ensure schema integrity and apply PRAGMAs.
+            3. Instantiate collector = HistoryCollector(repo).
         </initialization_flow>
         <message_flow>
             1. App layer (bot.py) validates the source against ACLs.
-            2. App layer calls collector.process_message(message).
+            2. For both incoming updates and outgoing (bot) messages, call collector.process_message(message).
             3. Collector extracts metadata via private _extract_* methods.
             4. Collector calls repository methods to upsert data.
         </message_flow>
@@ -68,6 +68,6 @@
 
     <operational_notes>
         <note>Connection Safety: Every repository method opens and closes its own connection via a private _get_connection() helper, ensuring thread safety in a multi-handler environment.</note>
-        <note>WAL Mode: Enabled to support concurrent read operations by maintenance tools (dump_db.py) while the bot processes updates.</note>
+        <note>WAL Mode: Enabled to support concurrent read operations by maintenance tools (dump_db.py) and future providers while the bot processes updates.</note>
     </operational_notes>
 </project_documentation>

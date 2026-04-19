@@ -1,4 +1,4 @@
-<project_documentation version="1.1" target_audience="Large Language Model (LLM)">
+<project_documentation target_audience="Large Language Model (LLM)">
     <identity>
         <name>Telegram Logger Bot (System)</name>
         <purpose>
@@ -13,19 +13,21 @@
             <component name="Application Layer (Root)">
                 <file name="bot.py">
                     Main entry point. Implements aiogram Dispatcher, event handlers, and business logic.
-                    Responsible for Access Control (filtering) and orchestrating data flow to the storage module.
+                    Orchestrates Dependency Injection by instantiating DatabaseRepository and HistoryCollector.
+                    Responsible for Access Control (filtering) and logging both incoming and outgoing data.
                 </file>
                 <file name="config.py">
                     Configuration manager. Loads environment variables, processes ACLs (ALLOWED_USERS, ALLOWED_CHATS),
                     and normalizes Telegram IDs.
                 </file>
                 <file name="dump_db.py">
-                    Maintenance utility. Exports logged data to JSON or HTML by utilizing the internal logic of the storage module.
+                    Maintenance utility. Exports logged data to JSON or HTML by utilizing the DatabaseRepository directly.
                 </file>
             </component>
             <component name="Persistence Layer (Module)">
                 <folder name="tg_bot_history">
                     Isolated module specialized in parsing Telegram objects and SQLite persistence.
+                    Utilizes Dependency Injection for repository management.
                     Refer to 'tg_bot_history/documentation.ai.xml' for detailed module specs.
                 </folder>
             </component>
@@ -42,10 +44,10 @@
             </logic>
         </access_control>
         <integration_flow>
-            1. 'bot.py' receives an update (Message, EditedMessage, or ChatMemberUpdated).
-            2. 'bot.py' validates the source against ACLs defined in 'config.py'.
-            3. If valid, 'bot.py' calls the respective processing function from 'tg_bot_history.collectors'.
-            4. The DB_PATH constant is passed from the root configuration to the module functions.
+            1. 'bot.py' initializes 'DatabaseRepository' with DB_PATH.
+            2. 'bot.py' injects the repository instance into 'HistoryCollector'.
+            3. Upon receiving/sending updates, 'bot.py' validates the source against ACLs.
+            4. Validated updates are passed to 'HistoryCollector' for parsing and persistence via the injected repository.
         </integration_flow>
     </logic_flows>
 
@@ -63,7 +65,7 @@
     <future_expansion>
         <note>
             The system is designed to provide structured history context for Large Language Models (LLM).
-            The 'tg_bot_history' module serves as the primary data provider for building LLM prompts based on chat history.
+            Future 'ContextProviders' will consume the same 'DatabaseRepository' instance to build LLM prompts.
         </note>
     </future_expansion>
 </project_documentation>
