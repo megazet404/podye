@@ -5,9 +5,9 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
-from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
-from database import init_db
-from handlers import process_message, process_edited_message, process_chat_member_update, is_allowed_chat, is_allowed_user
+from tg_bot_history.config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
+from tg_bot_history.db_manager import init_db
+from tg_bot_history.collectors import process_message, process_edited_message, process_chat_member_update, is_allowed_chat, is_allowed_user
 
 logging.basicConfig(
     level=logging.INFO,

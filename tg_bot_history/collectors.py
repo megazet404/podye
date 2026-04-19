@@ -4,13 +4,13 @@ import logging
 from typing import Optional, List, Dict, Any
 from aiogram import types
 from aiogram.types import ChatMemberUpdated
-from database import (
+from .db_manager import (
     get_db_connection, upsert_user, upsert_chat, insert_message,
     insert_media, update_chat_member_activity, update_chat_member_status,
     get_local_message_id, update_message_text, upsert_message
 )
 
-from config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
+from .config import DB_PATH, ALLOWED_USERS, ALLOWED_CHATS
 
 logger = logging.getLogger(__name__)
 

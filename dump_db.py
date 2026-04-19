@@ -3,7 +3,7 @@ import json
 import argparse
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union
-from database import get_db_connection, fetch_table_data, get_users_with_chats, get_chats_with_members
+from tg_bot_history.db_manager import get_db_connection, fetch_table_data, get_users_with_chats, get_chats_with_members, get_messages_grouped_by_chat
 
 def parse_date(date_str: str) -> int:
     """Converts ISO 8601 or Unix timestamp to Unix timestamp."""
@@ -294,7 +294,6 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
         data["users_full"] = get_users_with_chats(conn)
         data["chats_full"] = get_chats_with_members(conn)
         if chat_filter != 'none':
-            from database import get_messages_grouped_by_chat
             data["messages_full"] = get_messages_grouped_by_chat(conn, start_time, end_time, chat_filter)
     else:
         data["users"] = fetch_table_data(conn, "users")
