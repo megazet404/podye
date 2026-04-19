@@ -332,7 +332,8 @@ def generate_html(data: Dict[str, Any]) -> str:
             return "".join(html_segment)
 
         private_chats = {cid: info for cid, info in chats.items() if info['type'] == 'private'}
-        group_chats = {cid: info for cid, info in chats.items() if info['type'] != 'private'}
+        group_chats   = {cid: info for cid, info in chats.items() if info['type'] in ('group', 'supergroup')}
+        channel_chats = {cid: info for cid, info in chats.items() if info['type'] == 'channel'}
 
         html_segment = []
         if private_chats:
@@ -340,8 +341,12 @@ def generate_html(data: Dict[str, Any]) -> str:
             html_segment.append(render_chats_list(private_chats))
 
         if group_chats:
-            html_segment.append("<h2>Groups / Channels</h2>")
+            html_segment.append("<h2>Groups</h2>")
             html_segment.append(render_chats_list(group_chats))
+
+        if channel_chats:
+            html_segment.append("<h2>Channels</h2>")
+            html_segment.append(render_chats_list(channel_chats))
 
         return "".join(html_segment)
 
