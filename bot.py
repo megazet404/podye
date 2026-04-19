@@ -6,7 +6,6 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ChatMemberUpdated
 from config import BOT_TOKEN, ALLOWED_USERS, ALLOWED_CHATS, DB_PATH
-from tg_bot_history.db_manager import init_db
 from tg_bot_history.collectors import HistoryCollector
 
 logging.basicConfig(
@@ -91,7 +90,7 @@ async def main():
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Verbose mode enabled")
 
-    init_db(DB_PATH)
+    collector.initialize_storage()
     bot = Bot(token=BOT_TOKEN)
 
     try:

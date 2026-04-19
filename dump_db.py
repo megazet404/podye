@@ -3,7 +3,7 @@ import json
 import argparse
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union
-from tg_bot_history.db_manager import get_db_connection, fetch_table_data, get_users_with_chats, get_chats_with_members, get_messages_grouped_by_chat
+from tg_bot_history.db_manager import DatabaseRepository
 
 def parse_date(date_str: str) -> int:
     """Converts ISO 8601 or Unix timestamp to Unix timestamp."""
@@ -287,18 +287,18 @@ def generate_html(data: Dict[str, Any]) -> str:
 def dump_database(db_path: str, output_path: str, start_time: Optional[int],
                   end_time: Optional[int], chat_filter: Union[str, List[int]],
                   fmt: str) -> None:
-    conn = get_db_connection(db_path)
+    repo = DatabaseRepository(db_path)
     data = {}
 
     if fmt == 'html':
-        data["users_full"] = get_users_with_chats(conn)
-        data["chats_full"] = get_chats_with_members(conn)
+        data["users_full"] = repo.get_users_with_chats()
+        data["chats_full"] = repo.get_chats_with_members()
         if chat_filter != 'none':
-            data["messages_full"] = get_messages_grouped_by_chat(conn, start_time, end_time, chat_filter)
+            data["messages_full"] = repo.get_messages_grouped_by_chat(start_time, end_time, chat_filter)
     else:
-        data["users"] = fetch_table_data(conn, "users")
-        data["chats"] = fetch_table_data(conn, "chats")
-        data["chat_members"] = fetch_table_data(conn, "chat_members")
+        data["users"] = repo.fetch_table_data("users")
+        data["chats"] = repo.fetch_table_data("chats")
+        data["chat_members"] = repo.fetch_table_data("chat_members")
 
         if chat_filter == 'none':
             data["messages"] = []
@@ -307,7 +307,6 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
             message_conditions = []
             message_params = []
 
-            # Time filter
             if start_time is not None:
                 message_conditions.append("date >= ?")
                 message_params.append(start_time)
@@ -315,26 +314,22 @@ def dump_database(db_path: str, output_path: str, start_time: Optional[int],
                 message_conditions.append("date <= ?")
                 message_params.append(end_time)
 
-            # Chat filter
             if isinstance(chat_filter, list):
                 placeholders = ",".join("?" * len(chat_filter))
                 message_conditions.append(f"chat_id IN ({placeholders})")
                 message_params.extend(chat_filter)
 
             message_where = " AND ".join(message_conditions) if message_conditions else None
-            data["messages"] = fetch_table_data(conn, "messages", message_where, tuple(message_params))
+            data["messages"] = repo.fetch_table_data("messages", message_where, tuple(message_params))
 
-            # Dump media linked to selected messages
             if data["messages"]:
                 m_ids = tuple(m["id"] for m in data["messages"])
-                data["message_media"] = fetch_table_data(
-                    conn, "message_media",
+                data["message_media"] = repo.fetch_table_data(
+                    "message_media",
                     f"message_id IN ({','.join('?' * len(m_ids))})", m_ids
                 )
             else:
                 data["message_media"] = []
-
-    conn.close()
 
     with open(output_path, "w", encoding="utf-8") as f:
         if fmt == 'html':

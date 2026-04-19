@@ -4,17 +4,16 @@ import logging
 from typing import Optional, List
 from aiogram import types
 from aiogram.types import ChatMemberUpdated
-from .db_manager import (
-    get_db_connection, upsert_user, upsert_chat,
-    insert_media, update_chat_member_activity, update_chat_member_status,
-    get_local_message_id, upsert_message
-)
+from .db_manager import DatabaseRepository
 
 logger = logging.getLogger(__name__)
 
 class HistoryCollector:
     def __init__(self, db_path: str):
-        self.db_path = db_path
+        self.repo = DatabaseRepository(db_path)
+
+    def initialize_storage(self) -> None:
+        self.repo.init_db()
 
     def _extract_user_data(self, user: types.User) -> dict:
         return {
@@ -37,8 +36,7 @@ class HistoryCollector:
 
     def _extract_media_data(self, message: types.Message) -> List[dict]:
         media_list = []
-        
-        # Mapping logic for different media types
+
         if message.photo:
             for photo in message.photo:
                 media_list.append({
@@ -121,34 +119,36 @@ class HistoryCollector:
 
         return forward_sender_id, forward_message_id, forward_sender_name
 
-    def _save_message_to_db(self, conn, message: types.Message, timestamp: int,
+    def _save_message_to_db(self, message: types.Message, timestamp: int,
                              update_activity: bool = True) -> Optional[int]:
+        """Internal helper to coordinate extraction and repository calls."""
         chat_id = message.chat.id
-        upsert_chat(conn, self._extract_chat_data(message.chat), timestamp)
+        self.repo.upsert_chat(self._extract_chat_data(message.chat), timestamp)
 
         sender_id = None
         if message.from_user:
             sender_id = message.from_user.id
             if sender_id > 0:
-                upsert_user(conn, self._extract_user_data(message.from_user), timestamp)
+                self.repo.upsert_user(self._extract_user_data(message.from_user), timestamp)
                 if update_activity:
-                    update_chat_member_activity(conn, chat_id, sender_id, timestamp)
+                    self.repo.update_chat_member_activity(chat_id, sender_id, timestamp)
 
         if message.sender_chat:
             sender_id = message.sender_chat.id
-            upsert_chat(conn, self._extract_chat_data(message.sender_chat), timestamp)
+            self.repo.upsert_chat(self._extract_chat_data(message.sender_chat), timestamp)
 
         reply_to_local_id = None
         reply_to_tg_id = None
         if message.reply_to_message:
-            self._save_message_to_db(conn, message.reply_to_message, timestamp, update_activity=False)
+            # Recursive call without conn passing
+            self._save_message_to_db(message.reply_to_message, timestamp, update_activity=False)
             reply_to_tg_id = message.reply_to_message.message_id
-            reply_to_local_id = get_local_message_id(conn, reply_to_tg_id, chat_id)
+            reply_to_local_id = self.repo.get_local_message_id(reply_to_tg_id, chat_id)
 
         forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
         if forward_sender_id and forward_sender_id > 0:
             if message.forward_origin and message.forward_origin.type == "user":
-                upsert_user(conn, self._extract_user_data(message.forward_origin.sender_user), timestamp)
+                self.repo.upsert_user(self._extract_user_data(message.forward_origin.sender_user), timestamp)
 
         entities_list = message.entities or message.caption_entities
         entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
@@ -177,53 +177,43 @@ class HistoryCollector:
             "edit_date": edit_date_ts
         }
 
-        local_id = upsert_message(conn, message_data)
+        local_id = self.repo.upsert_message(message_data)
         media_list = self._extract_media_data(message)
         if media_list:
-            insert_media(conn, local_id, media_list)
+            self.repo.insert_media(local_id, media_list)
 
         return local_id
 
     def process_message(self, message: types.Message) -> None:
         logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
         timestamp = int(time.time())
-        conn = get_db_connection(self.db_path)
-        try:
-            self._save_message_to_db(conn, message, timestamp)
 
-            if message.new_chat_members:
-                for member in message.new_chat_members:
-                    upsert_user(conn, self._extract_user_data(member), timestamp)
-                    update_chat_member_status(conn, message.chat.id, member.id, "member", timestamp)
+        self._save_message_to_db(message, timestamp)
 
-            if message.left_chat_member:
-                update_chat_member_status(conn, message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
-        finally:
-            conn.close()
+        if message.new_chat_members:
+            for member in message.new_chat_members:
+                self.repo.upsert_user(self._extract_user_data(member), timestamp)
+                self.repo.update_chat_member_status(message.chat.id, member.id, "member", timestamp)
+
+        if message.left_chat_member:
+            self.repo.update_chat_member_status(message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
 
     def process_edited_message(self, message: types.Message) -> None:
         timestamp = int(time.time())
-        conn = get_db_connection(self.db_path)
-        try:
-            self._save_message_to_db(conn, message, timestamp, update_activity=False)
-        finally:
-            conn.close()
+        self._save_message_to_db(message, timestamp, update_activity=False)
 
     def process_chat_member_update(self, event: ChatMemberUpdated) -> None:
         timestamp = int(time.time())
-        conn = get_db_connection(self.db_path)
-        try:
-            chat_id = event.chat.id
-            user_id = event.from_user.id
-            upsert_user(conn, self._extract_user_data(event.from_user), timestamp)
+        chat_id = event.chat.id
+        user_id = event.from_user.id
 
-            old_status = event.old_chat_member.status
-            new_status = event.new_chat_member.status
+        self.repo.upsert_user(self._extract_user_data(event.from_user), timestamp)
 
-            is_left = new_status in ["left", "kicked"]
-            update_chat_member_status(conn, chat_id, user_id, new_status, timestamp, is_left)
+        old_status = event.old_chat_member.status
+        new_status = event.new_chat_member.status
 
-            if not is_left:
-                update_chat_member_activity(conn, chat_id, user_id, timestamp, new_status)
-        finally:
-            conn.close()
+        is_left = new_status in ["left", "kicked"]
+        self.repo.update_chat_member_status(chat_id, user_id, new_status, timestamp, is_left)
+
+        if not is_left:
+            self.repo.update_chat_member_activity(chat_id, user_id, timestamp, new_status)
