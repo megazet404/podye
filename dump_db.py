@@ -239,7 +239,8 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                     sender_id = m['sender_id']
                     if sender_id:
-                        sender_link = f"<a href='#user_{sender_id}' style='text-decoration: none; color: inherit;'>"
+                        anchor_prefix = "user" if sender_id > 0 else "chat"
+                        sender_link = f"<a href='#{anchor_prefix}_{sender_id}' style='text-decoration: none; color: inherit;'>"
                         sender_link_end = "</a>"
                     else:
                         sender_link = ""

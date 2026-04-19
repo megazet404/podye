@@ -136,11 +136,16 @@ class HistoryCollector:
 
         reply_to_message_id = None
         if message.reply_to_message:
-            # Recursive call without conn passing
             self._save_message_to_db(message.reply_to_message, timestamp, update_activity=False)
             reply_to_message_id = message.reply_to_message.message_id
 
+        entities_list = message.entities or message.caption_entities
+        entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
+        media_list = self._extract_media_data(message)
+        message_text = message.text or message.caption
+
         forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
+
         if forward_sender_id:
             origin = message.forward_origin
             if origin.type == "user":
@@ -150,8 +155,19 @@ class HistoryCollector:
             elif origin.type == "channel":
                 self.repo.upsert_chat(self._extract_chat_data(origin.chat), timestamp)
 
-        entities_list = message.entities or message.caption_entities
-        entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
+                origin_date_ts = int(origin.date.timestamp()) if hasattr(origin.date, 'timestamp') else int(origin.date)
+
+                origin_msg_data = {
+                    "message_id": origin.message_id,
+                    "chat_id": origin.chat.id,
+                    "sender_id": origin.chat.id,
+                    "text": message_text,
+                    "entities": entities_json,
+                    "date": origin_date_ts
+                }
+                self.repo.upsert_message(origin_msg_data)
+                if media_list:
+                    self.repo.insert_media(origin.message_id, origin.chat.id, media_list)
 
         date_val = message.date
         date_ts = int(date_val.timestamp()) if hasattr(date_val, 'timestamp') else int(date_val)
@@ -186,7 +202,7 @@ class HistoryCollector:
             "forward_sender_id": forward_sender_id,
             "forward_message_id": forward_message_id,
             "forward_sender_name": forward_sender_name,
-            "text": message.text or message.caption,
+            "text": message_text,
             "entities": entities_json,
             "media_group_id": message.media_group_id,
             "date": date_ts,

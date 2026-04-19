@@ -320,7 +320,9 @@ class DatabaseRepository:
         query = f"""
             SELECT
                 m.*,
-                u.first_name as sender_fname, u.last_name as sender_lname, u.username as sender_uname,
+                COALESCE(u.first_name, sc.title) as sender_fname, 
+                u.last_name as sender_lname, 
+                COALESCE(u.username, sc.username) as sender_uname,
                 c.title as chat_title, c.type as chat_type, c.username as chat_username,
                 cu.first_name as private_chat_fname, cu.last_name as private_chat_lname,
                 rm.text as reply_text, ru.first_name as reply_sender_fname, ru.last_name as reply_sender_lname,
@@ -328,6 +330,7 @@ class DatabaseRepository:
                 fc.title as fwd_chat_title
             FROM messages m
             LEFT JOIN users u ON m.sender_id = u.id
+            LEFT JOIN chats sc ON m.sender_id = sc.id
             JOIN chats c ON m.chat_id = c.id
             LEFT JOIN users cu ON c.id = cu.id AND c.type = 'private'
             LEFT JOIN messages rm ON m.reply_to_message_id = rm.message_id AND m.chat_id = rm.chat_id
