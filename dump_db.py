@@ -221,10 +221,14 @@ def generate_html(data: Dict[str, Any]) -> str:
                         r_sender = f"{m['reply_sender_fname'] or ''} {m['reply_sender_lname'] or ''}".strip() or "Unknown"
                         r_text = html.escape(display_text).replace("\n", "<br/>")
 
+                        reply_target_id = f"msg_{m['chat_id']}_{m['reply_to_message_id']}"
+                        
                         reply_block = (
+                            f"<a href='#{reply_target_id}' style='text-decoration: none; color: inherit;'>"
                             f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #0088cc; "
                             f"padding: 2px 0 2px 10px; margin-bottom: 8px; background: #f4f4f4;'>"
-                            f"<b>{html.escape(r_sender)}:</b><br/>{r_text}</div>"
+                            f"<b>{html.escape(r_sender)} (↑):</b><br/>{r_text}</div>"
+                            f"</a>"
                         )
 
                     original = ""
@@ -245,8 +249,9 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                     content += original
 
+                    msg_anchor_id = f"msg_{m['chat_id']}_{m['message_id']}"
                     html_segment.append(
-                        f"<tr>"
+                        f"<tr id='{msg_anchor_id}'>"
                         f"<td valign='top'>{format_timestamp(m['date'])}</td>"
                         f"<td valign='top'>{sender}</td>"
                         f"<td valign='top'>{content}</td>"
