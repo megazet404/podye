@@ -63,6 +63,7 @@ class DatabaseRepository:
                 chat_id INTEGER NOT NULL,
                 file_id TEXT NOT NULL,
                 file_unique_id TEXT NOT NULL,
+                thumbnail_file_id TEXT,
                 file_type TEXT NOT NULL,
                 file_size INTEGER,
                 mime_type TEXT,
@@ -183,13 +184,14 @@ class DatabaseRepository:
             for media in media_list:
                 conn.execute("""
                 INSERT OR IGNORE INTO message_media
-                (message_id, chat_id, file_id, file_unique_id, file_type, file_size, mime_type, file_path, width, height)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (message_id, chat_id, file_id, file_unique_id, thumbnail_file_id, file_type, file_size, mime_type, file_path, width, height)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     message_id,
                     chat_id,
                     media.get("file_id"),
                     media.get("file_unique_id"),
+                    media.get("thumbnail_file_id"),
                     media.get("file_type"),
                     media.get("file_size"),
                     media.get("mime_type"),

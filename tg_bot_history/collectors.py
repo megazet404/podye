@@ -60,6 +60,7 @@ class HistoryCollector:
             media_list.append({
                 "file_id": message.video.file_id,
                 "file_unique_id": message.video.file_unique_id,
+                "thumbnail_file_id": message.video.thumbnail.file_id if message.video.thumbnail else None,
                 "file_type": "video",
                 "file_size": message.video.file_size,
                 "mime_type": message.video.mime_type,
@@ -89,6 +90,7 @@ class HistoryCollector:
             media_list.append({
                 "file_id": message.video_note.file_id,
                 "file_unique_id": message.video_note.file_unique_id,
+                "thumbnail_file_id": message.video_note.thumbnail.file_id if message.video_note.thumbnail else None,
                 "file_type": "video_note",
                 "file_size": message.video_note.file_size,
                 "mime_type": "video/mp4"
