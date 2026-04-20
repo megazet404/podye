@@ -164,6 +164,7 @@ class HistoryCollector:
                     "sender_id": origin.chat.id,
                     "text": message_text,
                     "entities": entities_json,
+                    "media_group_id": message.media_group_id,
                     "date": origin_date_ts
                 }
                 self.repo.upsert_message(origin_msg_data)
