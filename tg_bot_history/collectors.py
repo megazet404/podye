@@ -35,16 +35,17 @@ class HistoryCollector:
         media_list = []
 
         if message.photo:
-            for photo in message.photo:
-                media_list.append({
-                    "file_id": photo.file_id,
-                    "file_unique_id": photo.file_unique_id,
-                    "file_type": "photo",
-                    "file_size": photo.file_size,
-                    "mime_type": "image/jpeg",
-                    "width": photo.width,
-                    "height": photo.height
-                })
+            # Collect the photo in original resolution only.
+            photo = message.photo[-1]
+            media_list.append({
+                "file_id": photo.file_id,
+                "file_unique_id": photo.file_unique_id,
+                "file_type": "photo",
+                "file_size": photo.file_size,
+                "mime_type": "image/jpeg",
+                "width": photo.width,
+                "height": photo.height
+            })
 
         if message.document:
             media_list.append({
