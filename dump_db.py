@@ -319,7 +319,26 @@ def generate_html(data: Dict[str, Any]) -> str:
                             f"{original_text_esc}</div>"
                         )
 
-                    content = f"{reply_block}{forward_block}{text_content}<br/>"
+                    media_info_block = ""
+                    if m.get('media'):
+                        media_items = []
+                        for item in m['media']:
+                            size_kb = f"{item['file_size'] / 1024:.1f} KB" if item['file_size'] else "unknown size"
+                            dims = f" ({item['width']}x{item['height']})" if item['width'] and item['height'] else ""
+                            media_items.append(
+                                f"<li><b>{html.escape(item['file_type'])}</b>: "
+                                f"{html.escape(item['mime_type'] or 'no-mime')}, {size_kb}{dims}<br/>"
+                                f"<small style='color: #888;'>ID: {html.escape(item['file_unique_id'])}</small></li>"
+                            )
+                        
+                        media_info_block = (
+                            f"<div style='margin-top: 8px; padding: 5px; background: #f9f9f9; border: 1px dashed #ccc;'>"
+                            f"<span style='font-size: 0.8em; color: #666;'>Attached Media Info:</span>"
+                            f"<ul style='margin: 0; padding-left: 20px; font-size: 0.85em;'>"
+                            f"{''.join(media_items)}</ul></div>"
+                        )
+
+                    content = f"{reply_block}{forward_block}{text_content}{media_info_block}<br/>"
                     if m['media_group_id']:
                         mg_id_esc = html.escape(m['media_group_id'])
                         content += f"<br/><small style='color: green;'>Media Group: {mg_id_esc}</small>"

@@ -344,4 +344,25 @@ class DatabaseRepository:
             cursor = conn.cursor()
             cursor.execute(query, tuple(params))
             cols = [d[0] for d in cursor.description]
-            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+            messages = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+            if not messages:
+                return []
+
+            message_ids = list(set((m['message_id'], m['chat_id']) for m in messages))
+            media_map = {}
+            
+            for m_id, c_id in message_ids:
+                cursor.execute(
+                    "SELECT * FROM message_media WHERE message_id = ? AND chat_id = ?",
+                    (m_id, c_id)
+                )
+                m_cols = [d[0] for d in cursor.description]
+                media_items = [dict(zip(m_cols, r)) for r in cursor.fetchall()]
+                if media_items:
+                    media_map[(m_id, c_id)] = media_items
+
+            for m in messages:
+                m['media'] = media_map.get((m['message_id'], m['chat_id']), [])
+
+            return messages
