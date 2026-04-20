@@ -302,7 +302,7 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                         f_msg_html = ""
                         if f_msg_link:
-                            f_msg_html = f" (<a href='{f_msg_link}' style='text-decoration: none; color: inherit;'>←</a>)"
+                            f_msg_html = f" (<a href='{f_msg_link}' style='text-decoration: none; color: inherit;'>→</a>)"
 
                         forward_block = (
                             f"<div style='color: #555; font-size: 0.85em; border-left: 3px solid #52a152; "
