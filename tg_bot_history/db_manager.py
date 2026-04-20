@@ -320,8 +320,8 @@ class DatabaseRepository:
         query = f"""
             SELECT
                 m.*,
-                COALESCE(u.first_name, sc.title) as sender_fname, 
-                u.last_name as sender_lname, 
+                COALESCE(u.first_name, sc.title) as sender_fname,
+                u.last_name as sender_lname,
                 COALESCE(u.username, sc.username) as sender_uname,
                 c.title as chat_title, c.type as chat_type, c.username as chat_username,
                 cu.first_name as private_chat_fname, cu.last_name as private_chat_lname,
@@ -351,7 +351,7 @@ class DatabaseRepository:
 
             message_ids = list(set((m['message_id'], m['chat_id']) for m in messages))
             media_map = {}
-            
+
             for m_id, c_id in message_ids:
                 cursor.execute(
                     "SELECT * FROM message_media WHERE message_id = ? AND chat_id = ?",
@@ -365,4 +365,33 @@ class DatabaseRepository:
             for m in messages:
                 m['media'] = media_map.get((m['message_id'], m['chat_id']), [])
 
-            return messages
+            # Aggregate messages with equal media_group_id.
+            final_messages = []
+            mg_registry = {}  # (chat_id, media_group_id) -> message_index_in_final_messages
+
+            for m in messages:
+                mg_id = m.get('media_group_id')
+                c_id = m.get('chat_id')
+
+                if mg_id:
+                    key = (c_id, mg_id)
+                    if key in mg_registry:
+                        master_idx = mg_registry[key]
+                        master_msg = final_messages[master_idx]
+
+                        if m.get('text'):
+                            if master_msg.get('text'):
+                                master_msg['text'] += f"\n[Part]: {m['text']}"
+                            else:
+                                master_msg['text'] = m['text']
+
+                        if m.get('media'):
+                            master_msg['media'].extend(m['media'])
+
+                        continue
+                    else:
+                        mg_registry[key] = len(final_messages)
+
+                final_messages.append(m)
+
+            return final_messages
