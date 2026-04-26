@@ -214,16 +214,20 @@ class DatabaseRepository:
                 ))
 
     def update_chat_member_activity(self, chat_id: int, user_id: int,
-                                     timestamp: int, status: str = "member") -> None:
+                                     timestamp: int, status: str = "unknown") -> None:
         with self._get_connection() as conn:
             conn.execute("""
             INSERT INTO chat_members (chat_id, user_id, status, first_activity, last_activity, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT (chat_id, user_id) DO UPDATE SET
-                status = excluded.status,
-                last_activity = excluded.last_activity,
-                updated_at = excluded.updated_at,
-                first_activity = COALESCE(chat_members.first_activity, excluded.first_activity)
+                status = CASE
+                    WHEN chat_members.status IS NULL OR chat_members.status = 'unknown'
+                    THEN excluded.status
+                    ELSE chat_members.status
+                END,
+                last_activity = MAX(COALESCE(chat_members.last_activity, 0), excluded.last_activity),
+                first_activity = MIN(COALESCE(chat_members.first_activity, excluded.first_activity), excluded.first_activity),
+                updated_at = MAX(chat_members.updated_at, excluded.updated_at)
             """, (chat_id, user_id, status, timestamp, timestamp, timestamp))
 
     def update_chat_member_status(self, chat_id: int, user_id: int,
@@ -263,6 +267,14 @@ class DatabaseRepository:
                 left_at = COALESCE(excluded.left_at, chat_members.left_at),
                 updated_at = excluded.updated_at
             """, (chat_id, user_id, status, joined_at, left_at, timestamp))
+
+    def ensure_chat_member(self, chat_id: int, user_id: int, timestamp: int) -> None:
+        """Ensures that the user is registered in the chat_members table without forcing an activity update."""
+        with self._get_connection() as conn:
+            conn.execute("""
+            INSERT OR IGNORE INTO chat_members (chat_id, user_id, status, updated_at)
+            VALUES (?, ?, 'unknown', ?)
+            """, (chat_id, user_id, timestamp))
 
     def get_local_message_id(self, tg_id: int, chat_id: int) -> Optional[int]:
         with self._get_connection() as conn:

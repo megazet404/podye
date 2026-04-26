@@ -119,27 +119,31 @@ class HistoryCollector:
 
         return forward_sender_id, forward_message_id, forward_sender_name
 
-    def _save_message_to_db(self, message: types.Message, timestamp: int,
-                         update_activity: bool = True) -> None:
+    def _save_message_to_db(self, message: types.Message, current_timestamp: int) -> None:
         """Internal helper to coordinate extraction and repository calls."""
         chat_id = message.chat.id
-        self.repo.upsert_chat(self._extract_chat_data(message.chat), timestamp)
+        # Use message's original date for activity tracking, or current time if missing
+        msg_date_ts = int(message.date.timestamp()) if hasattr(message.date, 'timestamp') else int(message.date)
+
+        self.repo.upsert_chat(self._extract_chat_data(message.chat), current_timestamp)
 
         sender_id = None
         if message.from_user:
             sender_id = message.from_user.id
             if sender_id > 0:
-                self.repo.upsert_user(self._extract_user_data(message.from_user), timestamp)
-                if update_activity:
-                    self.repo.update_chat_member_activity(chat_id, sender_id, timestamp)
+                self.repo.upsert_user(self._extract_user_data(message.from_user), current_timestamp)
 
         if message.sender_chat:
             sender_id = message.sender_chat.id
-            self.repo.upsert_chat(self._extract_chat_data(message.sender_chat), timestamp)
+            self.repo.upsert_chat(self._extract_chat_data(message.sender_chat), current_timestamp)
+
+        if sender_id:
+            # Every message/reply/pin is an evidence of activity at its own date
+            self.repo.update_chat_member_activity(chat_id, sender_id, msg_date_ts)
 
         reply_to_message_id = None
         if message.reply_to_message:
-            self._save_message_to_db(message.reply_to_message, timestamp, update_activity=False)
+            self._save_message_to_db(message.reply_to_message, current_timestamp)
             reply_to_message_id = message.reply_to_message.message_id
 
         entities_list = message.entities or message.caption_entities
