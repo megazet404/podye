@@ -167,7 +167,7 @@ class HistoryCollector:
         elif message.pinned_message:
             content_type = "service"
             # Actualize the original pinned message
-            self._save_message_to_db(message.pinned_message, timestamp, update_activity=False)
+            self._save_message_to_db(message.pinned_message, current_timestamp)
             self.repo.update_message_pin_status(chat_id, message.pinned_message.message_id, 1)
             message_text = json.dumps({
                 "pinned_message": {"message_id": message.pinned_message.message_id}
@@ -178,11 +178,11 @@ class HistoryCollector:
         if forward_sender_id:
             origin = message.forward_origin
             if origin.type == "user":
-                self.repo.upsert_user(self._extract_user_data(origin.sender_user), timestamp)
+                self.repo.upsert_user(self._extract_user_data(origin.sender_user), current_timestamp)
             elif origin.type == "chat":
-                self.repo.upsert_chat(self._extract_chat_data(origin.sender_chat), timestamp)
+                self.repo.upsert_chat(self._extract_chat_data(origin.sender_chat), current_timestamp)
             elif origin.type == "channel":
-                self.repo.upsert_chat(self._extract_chat_data(origin.chat), timestamp)
+                self.repo.upsert_chat(self._extract_chat_data(origin.chat), current_timestamp)
 
                 origin_date_ts = int(origin.date.timestamp()) if hasattr(origin.date, 'timestamp') else int(origin.date)
 
@@ -265,7 +265,7 @@ class HistoryCollector:
 
     def process_edited_message(self, message: types.Message) -> None:
         timestamp = int(time.time())
-        self._save_message_to_db(message, timestamp, update_activity=False)
+        self._save_message_to_db(message, timestamp)
 
     def process_chat_member_update(self, event: ChatMemberUpdated) -> None:
         timestamp = int(time.time())
