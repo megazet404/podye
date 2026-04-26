@@ -145,7 +145,29 @@ class HistoryCollector:
         entities_list = message.entities or message.caption_entities
         entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
         media_list = self._extract_media_data(message)
+
+        content_type = "regular"
         message_text = message.text or message.caption
+
+        # Service events extraction and minimization
+        if message.new_chat_members:
+            content_type = "service"
+            message_text = json.dumps({
+                "new_chat_members": [{"id": u.id} for u in message.new_chat_members]
+            }, ensure_ascii=False)
+        elif message.left_chat_member:
+            content_type = "service"
+            message_text = json.dumps({
+                "left_chat_member": {"id": message.left_chat_member.id}
+            }, ensure_ascii=False)
+        elif message.pinned_message:
+            content_type = "service"
+            # Actualize the original pinned message
+            self._save_message_to_db(message.pinned_message, timestamp, update_activity=False)
+            self.repo.update_message_pin_status(chat_id, message.pinned_message.message_id, 1)
+            message_text = json.dumps({
+                "pinned_message": {"message_id": message.pinned_message.message_id}
+            }, ensure_ascii=False)
 
         forward_sender_id, forward_message_id, forward_sender_name = self._extract_forward_sender_info(message)
 
@@ -167,7 +189,8 @@ class HistoryCollector:
                     "text": message_text,
                     "entities": entities_json,
                     "media_group_id": message.media_group_id,
-                    "date": origin_date_ts
+                    "date": origin_date_ts,
+                    "content_type": content_type
                 }
                 self.repo.upsert_message(origin_msg_data)
                 if media_list:
@@ -210,19 +233,18 @@ class HistoryCollector:
             "entities": entities_json,
             "media_group_id": message.media_group_id,
             "date": date_ts,
-            "edit_date": edit_date_ts
+            "edit_date": edit_date_ts,
+            "content_type": content_type,
+            "pinned": 0
         }
 
         self.repo.upsert_message(message_data)
-        media_list = self._extract_media_data(message)
         if media_list:
             self.repo.insert_media(message.message_id, chat_id, media_list)
 
     def process_message(self, message: types.Message) -> None:
         logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}")
         timestamp = int(time.time())
-
-        self._save_message_to_db(message, timestamp)
 
         if message.new_chat_members:
             for member in message.new_chat_members:
@@ -231,8 +253,11 @@ class HistoryCollector:
                 self.repo.transition_chat_member_status(message.chat.id, member.id, "member", timestamp)
 
         if message.left_chat_member:
+            self.repo.upsert_user(self._extract_user_data(message.left_chat_member), timestamp)
             # Use transition update for messages (only if state group changes)
             self.repo.transition_chat_member_status(message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
+
+        self._save_message_to_db(message, timestamp)
 
     def process_edited_message(self, message: types.Message) -> None:
         timestamp = int(time.time())

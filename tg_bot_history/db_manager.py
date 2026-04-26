@@ -55,6 +55,8 @@ class DatabaseRepository:
                 media_group_id TEXT,
                 date INTEGER NOT NULL,
                 edit_date INTEGER,
+                content_type TEXT NOT NULL DEFAULT 'regular',
+                pinned INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (message_id, chat_id)
             );
 
@@ -147,8 +149,9 @@ class DatabaseRepository:
             (message_id, chat_id, sender_id, reply_to_message_id,
              quote_text, quote_entities, quote_offset, quote_is_manual,
              forward_sender_id, forward_message_id, forward_sender_name,
-             original_text, text, entities, media_group_id, date, edit_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             original_text, text, entities, media_group_id, date, edit_date,
+             content_type, pinned)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (message_id, chat_id) DO UPDATE SET
                 text = CASE
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
@@ -158,7 +161,8 @@ class DatabaseRepository:
                     THEN excluded.entities ELSE messages.entities END,
                 edit_date = CASE
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
-                    THEN excluded.edit_date ELSE messages.edit_date END
+                    THEN excluded.edit_date ELSE messages.edit_date END,
+                pinned = MAX(messages.pinned, excluded.pinned)
             """, (
                 message_data.get("message_id"),
                 message_data.get("chat_id"),
@@ -176,8 +180,17 @@ class DatabaseRepository:
                 message_data.get("entities"),
                 message_data.get("media_group_id"),
                 message_data.get("date"),
-                message_data.get("edit_date")
+                message_data.get("edit_date"),
+                message_data.get("content_type"),
+                message_data.get("pinned", 0)
             ))
+
+    def update_message_pin_status(self, chat_id: int, message_id: int, pinned: int) -> None:
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE messages SET pinned = ? WHERE chat_id = ? AND message_id = ?",
+                (pinned, chat_id, message_id)
+            )
 
     def insert_media(self, message_id: int, chat_id: int, media_list: List[dict]) -> None:
         with self._get_connection() as conn:
