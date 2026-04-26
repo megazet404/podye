@@ -227,10 +227,12 @@ class HistoryCollector:
         if message.new_chat_members:
             for member in message.new_chat_members:
                 self.repo.upsert_user(self._extract_user_data(member), timestamp)
-                self.repo.update_chat_member_status(message.chat.id, member.id, "member", timestamp)
+                # Use transition update for messages (only if state group changes)
+                self.repo.transition_chat_member_status(message.chat.id, member.id, "member", timestamp)
 
         if message.left_chat_member:
-            self.repo.update_chat_member_status(message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
+            # Use transition update for messages (only if state group changes)
+            self.repo.transition_chat_member_status(message.chat.id, message.left_chat_member.id, "left", timestamp, is_left=True)
 
     def process_edited_message(self, message: types.Message) -> None:
         timestamp = int(time.time())
@@ -243,11 +245,17 @@ class HistoryCollector:
 
         self.repo.upsert_user(self._extract_user_data(event.from_user), timestamp)
 
-        old_status = event.old_chat_member.status
-        new_status = event.new_chat_member.status
+        new_member = event.new_chat_member
+        status = new_member.status
 
-        is_left = new_status in ["left", "kicked"]
-        self.repo.update_chat_member_status(chat_id, user_id, new_status, timestamp, is_left)
+        # Simplify 'restricted' status to 'muted' or 'member' for LLM context
+        if status == "restricted":
+            can_send = getattr(new_member, "can_send_messages", True)
+            status = "member" if can_send else "muted"
+
+        is_left = status in ["left", "kicked"]
+        # Use authoritative update for state changes (trust exactly what Telegram says)
+        self.repo.update_chat_member_status(chat_id, user_id, status, timestamp, is_left)
 
         if not is_left:
-            self.repo.update_chat_member_activity(chat_id, user_id, timestamp, new_status)
+            self.repo.update_chat_member_activity(chat_id, user_id, timestamp, status)

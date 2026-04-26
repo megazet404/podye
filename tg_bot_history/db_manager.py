@@ -215,25 +215,41 @@ class DatabaseRepository:
 
     def update_chat_member_status(self, chat_id: int, user_id: int,
                                    status: str, timestamp: int, is_left: bool = False) -> None:
+        """Authoritative status update (used by ChatMemberUpdated). Trust Telegram's exact state."""
         with self._get_connection() as conn:
-            if is_left:
-                conn.execute("""
-                INSERT INTO chat_members (chat_id, user_id, status, left_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (chat_id, user_id) DO UPDATE SET
-                    status = excluded.status,
-                    left_at = excluded.left_at,
-                    updated_at = excluded.updated_at
-                """, (chat_id, user_id, status, timestamp, timestamp))
-            else:
-                conn.execute("""
-                INSERT INTO chat_members (chat_id, user_id, status, joined_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (chat_id, user_id) DO UPDATE SET
-                    status = excluded.status,
-                    joined_at = excluded.joined_at,
-                    updated_at = excluded.updated_at
-                """, (chat_id, user_id, status, timestamp, timestamp))
+            joined_at = timestamp if not is_left else None
+            left_at = timestamp if is_left else None
+            conn.execute("""
+            INSERT INTO chat_members (chat_id, user_id, status, joined_at, left_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (chat_id, user_id) DO UPDATE SET
+                status = excluded.status,
+                joined_at = COALESCE(excluded.joined_at, chat_members.joined_at),
+                left_at = COALESCE(excluded.left_at, chat_members.left_at),
+                updated_at = excluded.updated_at
+            """, (chat_id, user_id, status, joined_at, left_at, timestamp))
+
+    def transition_chat_member_status(self, chat_id: int, user_id: int,
+                                       status: str, timestamp: int, is_left: bool = False) -> None:
+        """Conditional status update (used by Message). Only update on fundamental state change."""
+        with self._get_connection() as conn:
+            joined_at = timestamp if not is_left else None
+            left_at = timestamp if is_left else None
+            conn.execute("""
+            INSERT INTO chat_members (chat_id, user_id, status, joined_at, left_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (chat_id, user_id) DO UPDATE SET
+                status = CASE
+                    -- Change only if moving between Active (member, administrator, etc) and Inactive (left, kicked)
+                    WHEN (chat_members.status IN ('left', 'kicked') AND excluded.status NOT IN ('left', 'kicked'))
+                         OR (chat_members.status NOT IN ('left', 'kicked') AND excluded.status IN ('left', 'kicked'))
+                    THEN excluded.status
+                    ELSE chat_members.status
+                END,
+                joined_at = COALESCE(excluded.joined_at, chat_members.joined_at),
+                left_at = COALESCE(excluded.left_at, chat_members.left_at),
+                updated_at = excluded.updated_at
+            """, (chat_id, user_id, status, joined_at, left_at, timestamp))
 
     def get_local_message_id(self, tg_id: int, chat_id: int) -> Optional[int]:
         with self._get_connection() as conn:
