@@ -153,12 +153,22 @@ class DatabaseRepository:
              message_class, pinned)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (message_id, chat_id) DO UPDATE SET
+                sender_id = COALESCE(messages.sender_id, excluded.sender_id),
+                reply_to_message_id = COALESCE(messages.reply_to_message_id, excluded.reply_to_message_id),
                 text = CASE
-                    WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
-                    THEN excluded.text ELSE messages.text END,
+                    WHEN excluded.text IS NOT NULL AND excluded.text != '' AND (
+                        COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0) OR
+                        messages.text IS NULL OR messages.text = ''
+                    ) THEN excluded.text ELSE messages.text END,
+                original_text = COALESCE(messages.original_text, excluded.original_text),
                 entities = CASE
-                    WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
-                    THEN excluded.entities ELSE messages.entities END,
+                    WHEN excluded.entities IS NOT NULL AND (
+                        COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0) OR
+                        messages.entities IS NULL
+                    ) THEN excluded.entities ELSE messages.entities END,
+                message_class = CASE
+                    WHEN excluded.message_class = 'regular' AND messages.message_class = 'service'
+                    THEN 'service' ELSE excluded.message_class END,
                 edit_date = CASE
                     WHEN COALESCE(excluded.edit_date, 0) >= COALESCE(messages.edit_date, 0)
                     THEN excluded.edit_date ELSE messages.edit_date END,
