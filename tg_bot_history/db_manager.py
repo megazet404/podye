@@ -276,13 +276,6 @@ class DatabaseRepository:
             VALUES (?, ?, 'unknown', ?)
             """, (chat_id, user_id, timestamp))
 
-    def get_local_message_id(self, tg_id: int, chat_id: int) -> Optional[int]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM messages WHERE tg_id = ? AND chat_id = ?", (tg_id, chat_id))
-            result = cursor.fetchone()
-            return result[0] if result else None
-
     def fetch_table_data(self, table: str, where: Optional[str] = None, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
