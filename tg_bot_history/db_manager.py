@@ -231,7 +231,7 @@ class DatabaseRepository:
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (chat_id, user_id) DO UPDATE SET
                     status = excluded.status,
-                    joined_at = COALESCE(chat_members.joined_at, excluded.joined_at),
+                    joined_at = excluded.joined_at,
                     updated_at = excluded.updated_at
                 """, (chat_id, user_id, status, timestamp, timestamp))
 
