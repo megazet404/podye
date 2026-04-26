@@ -231,7 +231,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                     f"</h3>"
                 )
                 html_segment.append("<table border='1' cellspacing='0' cellpadding='5'>")
-                html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>ID</th><th>Pinned</th><th>Type</th><th>Content</th></tr>")
+                html_segment.append("<tr bgcolor='#ddd'><th>Date</th><th>Sender</th><th>ID</th><th>Pinned</th><th>Class</th><th>Content</th></tr>")
 
                 for m in cinfo["msgs"]:
                     sender_name = f"{m['sender_fname'] or ''} {m['sender_lname'] or ''}".strip() or "Unknown"
@@ -254,7 +254,7 @@ def generate_html(data: Dict[str, Any]) -> str:
 
                     msg_id = m['message_id']
                     is_pinned = "Yes" if m.get('pinned') else "No"
-                    content_type = html.escape(m.get('content_type', 'regular'))
+                    message_class = html.escape(m.get('message_class', 'regular'))
 
                     text_content = html.escape(m['text'] or "").replace("\n", "<br/>")
 
@@ -358,7 +358,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                         f"<td valign='top'>{sender}</td>"
                         f"<td valign='top'>{msg_id}</td>"
                         f"<td valign='top'>{is_pinned}</td>"
-                        f"<td valign='top'>{content_type}</td>"
+                        f"<td valign='top'>{message_class}</td>"
                         f"<td valign='top'>{content}</td>"
                         f"</tr>"
                     )

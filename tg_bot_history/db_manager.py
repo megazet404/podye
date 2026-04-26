@@ -55,7 +55,7 @@ class DatabaseRepository:
                 media_group_id TEXT,
                 date INTEGER NOT NULL,
                 edit_date INTEGER,
-                content_type TEXT NOT NULL DEFAULT 'regular',
+                message_class TEXT NOT NULL DEFAULT 'regular',
                 pinned INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (message_id, chat_id)
             );
@@ -150,7 +150,7 @@ class DatabaseRepository:
              quote_text, quote_entities, quote_offset, quote_is_manual,
              forward_sender_id, forward_message_id, forward_sender_name,
              original_text, text, entities, media_group_id, date, edit_date,
-             content_type, pinned)
+             message_class, pinned)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (message_id, chat_id) DO UPDATE SET
                 text = CASE
@@ -181,7 +181,7 @@ class DatabaseRepository:
                 message_data.get("media_group_id"),
                 message_data.get("date"),
                 message_data.get("edit_date"),
-                message_data.get("content_type"),
+                message_data.get("message_class"),
                 message_data.get("pinned", 0)
             ))
 

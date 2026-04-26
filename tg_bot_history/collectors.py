@@ -150,22 +150,22 @@ class HistoryCollector:
         entities_json = json.dumps([e.model_dump() for e in entities_list]) if entities_list else None
         media_list = self._extract_media_data(message)
 
-        content_type = "regular"
+        message_class = "regular"
         message_text = message.text or message.caption
 
         # Service events extraction and minimization
         if message.new_chat_members:
-            content_type = "service"
+            message_class = "service"
             message_text = json.dumps({
                 "new_chat_members": [{"id": u.id} for u in message.new_chat_members]
             }, ensure_ascii=False)
         elif message.left_chat_member:
-            content_type = "service"
+            message_class = "service"
             message_text = json.dumps({
                 "left_chat_member": {"id": message.left_chat_member.id}
             }, ensure_ascii=False)
         elif message.pinned_message:
-            content_type = "service"
+            message_class = "service"
             # Actualize the original pinned message
             self._save_message_to_db(message.pinned_message, current_timestamp)
             self.repo.update_message_pin_status(chat_id, message.pinned_message.message_id, 1)
@@ -194,7 +194,7 @@ class HistoryCollector:
                     "entities": entities_json,
                     "media_group_id": message.media_group_id,
                     "date": origin_date_ts,
-                    "content_type": content_type
+                    "message_class": message_class
                 }
                 self.repo.upsert_message(origin_msg_data)
                 if media_list:
@@ -238,7 +238,7 @@ class HistoryCollector:
             "media_group_id": message.media_group_id,
             "date": date_ts,
             "edit_date": edit_date_ts,
-            "content_type": content_type,
+            "message_class": message_class,
             "pinned": 0
         }
 

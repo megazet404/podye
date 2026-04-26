@@ -35,7 +35,7 @@
         </table>
         <table name="messages">
             <description>Log of captured messages with edit history support. Uses Telegram-native IDs as keys.</description>
-            <fields>message_id (PK), chat_id (PK), sender_id, reply_to_message_id, quote_text, quote_entities, quote_offset, quote_is_manual, forward_sender_id, forward_message_id, forward_sender_name, original_text, text, entities (JSON), media_group_id, date, edit_date, content_type, pinned.</fields>
+            <fields>message_id (PK), chat_id (PK), sender_id, reply_to_message_id, quote_text, quote_entities, quote_offset, quote_is_manual, forward_sender_id, forward_message_id, forward_sender_name, original_text, text, entities (JSON), media_group_id, date, edit_date, message_class, pinned.</fields>
         </table>
         <table name="message_media">
             <description>Metadata for files attached to messages. Linked via composite key.</description>
@@ -71,7 +71,7 @@
 
     <operational_notes>
         <note>Identity Mapping: The system avoids internal surrogate IDs for messages. All relations are built upon (message_id, chat_id) pairs to maintain direct parity with Telegram Bot API state.</note>
-        <note>Content Strategy: Service messages are stored with content_type='service'. Their 'text' field contains a JSON object with minimal IDs (e.g., {"pinned_message": {"message_id": 123}}), allowing LLMs to reconstruct context by querying referenced entities.</note>
+        <note>Content Strategy: Service messages are stored with message_class='service'. Their 'text' field contains a JSON object with minimal IDs (e.g., {"pinned_message": {"message_id": 123}}), allowing LLMs to reconstruct context by querying referenced entities.</note>
         <note>Pin Tracking: The 'pinned' field (0/1) tracks the historical pin status of a message. It is updated upon receiving a service message about the pin action.</note>
         <note>Connection Safety: Every repository method opens and closes its own connection via a private _get_connection() helper, ensuring thread safety in a multi-handler environment.</note>
         <note>WAL Mode: Enabled to support concurrent read operations by maintenance tools (dump_db.py) while the bot processes updates.</note>
