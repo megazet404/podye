@@ -263,7 +263,7 @@ def generate_html(data: Dict[str, Any]) -> str:
                         quote_text = m.get('quote_text')
                         replied_full_text = m.get('reply_text')
 
-                        display_text = quote_text if quote_text else (replied_full_text if replied_full_text else "[Media]")
+                        display_text = quote_text if quote_text else (replied_full_text if replied_full_text else "[Empty]")
 
                         r_sender = f"{m['reply_sender_fname'] or ''} {m['reply_sender_lname'] or ''}".strip() or "Unknown"
                         r_text = html.escape(display_text).replace("\n", "<br/>")
